@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Brick\Money\Money;
 use Civi\Api4\PaymentprocessorWebhook;
 use CRM_Stripe_ExtensionUtil as E;
 use Civi\Payment\PropertyBag;
@@ -240,11 +241,20 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return string
    */
-  public function getAmount($params = []): string {
+  protected function getAmount($params = []) {
     $amount = number_format((float) $params['amount'] ?? 0.0, CRM_Utils_Money::getCurrencyPrecision($this->getCurrency($params)), '.', '');
     // Stripe amount required in cents.
     $amount = preg_replace('/[^\d]/', '', strval($amount));
     return $amount;
+  }
+
+  /**
+   * @param \Civi\Payment\PropertyBag $propertyBag
+   *
+   * @throws \Brick\Money\Exception\UnknownCurrencyException
+   */
+  public function getAmountFormattedForStripeAPI(PropertyBag $propertyBag): string {
+    return Money::of($propertyBag->getAmount(), $propertyBag->getCurrency())->getMinorAmount()->getIntegralPart();
   }
 
   /**
@@ -550,7 +560,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    */
   public function doPayment(&$paymentParams, $component = 'contribute') {
     /* @var \Civi\Payment\PropertyBag $propertyBag */
-    $propertyBag = \Civi\Payment\PropertyBag::cast($paymentParams);
+    $propertyBag = PropertyBag::cast($paymentParams);
 
     $zeroAmountPayment = $this->processZeroAmountPayment($propertyBag);
     if ($zeroAmountPayment) {
@@ -583,10 +593,11 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $newParams = [];
     CRM_Utils_Hook::alterPaymentProcessorParams($this, $propertyBag, $newParams);
 
+    $amountFormattedForStripe = $this->getAmountFormattedForStripeAPI($propertyBag);
+
     // @fixme DO NOT SET ANYTHING ON $propertyBag or $params BELOW THIS LINE (we are reading from both)
     $params = $this->getPropertyBagAsArray($propertyBag);
 
-    $amountFormattedForStripe = self::getAmount($params);
     $email = $this->getBillingEmail($params, $propertyBag->getContactID());
 
     // See if we already have a stripe customer
@@ -687,8 +698,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $paymentIntentID = $propertyBag->getCustomProperty('paymentIntentID');
       }
       $intent = $this->stripeClient->paymentIntents->retrieve($paymentIntentID);
-      if ($intent->amount != $this->getAmount($params)) {
-        $intentParams['amount'] = $this->getAmount($params);
+      if ($intent->amount != $this->getAmountFormattedForStripeAPI($propertyBag)) {
+        $intentParams['amount'] = $this->getAmountFormattedForStripeAPI($propertyBag);
       }
       $intent = $this->stripeClient->paymentIntents->update($intent->id, $intentParams);
     }
@@ -979,10 +990,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       }
     }
 
+    $propertyBag = PropertyBag::cast($params);
+
     $refundParams = [
       'charge' => $params['trxn_id'],
     ];
-    $refundParams['amount'] = $this->getAmount($params);
+    $refundParams['amount'] = $this->getAmountFormattedForStripeAPI($propertyBag);
     try {
       $refund = $this->stripeClient->refunds->create($refundParams);
       // Stripe does not refund fees - see https://support.stripe.com/questions/understanding-fees-for-refunded-payments
@@ -1203,7 +1216,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @return array|null[]
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function doCancelRecurring(\Civi\Payment\PropertyBag $propertyBag) {
+  public function doCancelRecurring(PropertyBag $propertyBag) {
     // By default we always notify the processor and we don't give the user the option
     // because supportsCancelRecurringNotifyOptional() = FALSE
     if (!$propertyBag->has('isNotifyProcessorOnCancelRecur')) {

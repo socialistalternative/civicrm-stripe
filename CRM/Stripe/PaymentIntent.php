@@ -9,6 +9,7 @@
  +--------------------------------------------------------------------+
  */
 
+use Civi\Payment\PropertyBag;
 use CRM_Stripe_ExtensionUtil as E;
 
 /**
@@ -456,7 +457,7 @@ class CRM_Stripe_PaymentIntent {
         if (!empty($params['moto'])) {
           $intentParams['payment_method_options']['card']['moto'] = TRUE;
         }
-        $intentParams['amount'] = $this->paymentProcessor->getAmount(['amount' => $params['amount'], 'currency' => $params['currency']]);
+        $intentParams['amount'] = $this->paymentProcessor->getAmountFormattedForStripeAPI(PropertyBag::cast(['amount' => $params['amount'], 'currency' => $params['currency']]));
         $intentParams['currency'] = $params['currency'];
         // authorize the amount but don't take from card yet
         $intentParams['capture_method'] = 'manual';
