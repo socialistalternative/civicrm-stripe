@@ -16,8 +16,8 @@
     <email>mjw@mjwconsult.co.uk</email>
   </maintainer>
   <releaseDate>2023-04-09</releaseDate>
-  <version>6.8.2</version>
-  <develStage>stable</develStage>
+  <version>6.9-dev</version>
+  <develStage>alpha</develStage>
   <compatibility>
     <ver>5.58</ver>
   </compatibility>
