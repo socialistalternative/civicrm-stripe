@@ -355,12 +355,12 @@ class Events {
       'total_amount' => $refundParams['total_amount'],
     ]);
     if (!empty($refundPayment['count'])) {
-      $return->message = 'OK - refund already recorded';
+      $return->message = 'OK - refund already recorded. Contribution ID: ' . $contribution['id'];
       $return->ok = TRUE;
     }
     else {
       $this->updateContributionRefund($refundParams);
-      $return->message = 'OK - refund recorded';
+      $return->message = 'OK - refund recorded. Contribution ID: ' . $contribution['id'];
       $return->ok = TRUE;
     }
     $lock->release();
@@ -530,6 +530,7 @@ class Events {
     $lock->release();
 
     $this->handleInstallmentsForSubscription($subscriptionID, $contributionRecur['id']);
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
     $return->ok = TRUE;
     return $return;
   }
@@ -589,6 +590,7 @@ class Events {
         'trxn_id' => $invoiceID,
       ]);
     }
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
     $return->ok = TRUE;
     return $return;
   }
@@ -650,6 +652,7 @@ class Events {
       ];
       $this->updateContributionFailed($params);
     }
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
     $return->ok = TRUE;
     return $return;
   }
