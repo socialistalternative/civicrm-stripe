@@ -90,11 +90,12 @@ class Events {
    * @param string $chargeID Optional, one of chargeID, invoiceID, subscriptionID must be specified
    * @param string $invoiceID
    * @param string $subscriptionID
+   * @param string $paymentIntentID
    *
    * @return array
    * @throws \CRM_Core_Exception
    */
-  private function findContribution(string $chargeID = '', string $invoiceID = '', string $subscriptionID = ''): array {
+  private function findContribution(string $chargeID = '', string $invoiceID = '', string $subscriptionID = '', string $paymentIntentID = ''): array {
     $paymentParams = [
       'contribution_test' => $this->getPaymentProcessor()->getIsTestMode(),
     ];
@@ -103,6 +104,14 @@ class Events {
     if (!empty($chargeID)) {
       $paymentParams['trxn_id'] = $chargeID;
       $contributionApi3 = civicrm_api3('Mjwpayment', 'get_contribution', $paymentParams);
+    }
+
+    // A2) trxn_id = paymentIntentID if set by checkout.session.completed
+    if (empty($contributionApi3['count'])) {
+      if (!empty($paymentIntentID)) {
+        $paymentParams['trxn_id'] = $paymentIntentID;
+        $contributionApi3 = civicrm_api3('Mjwpayment', 'get_contribution', $paymentParams);
+      }
     }
 
     // B2) Contribution linked to subscription and we have invoice_id
