@@ -598,47 +598,15 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     // @fixme DO NOT SET ANYTHING ON $propertyBag or $params BELOW THIS LINE (we are reading from both)
     $params = $this->getPropertyBagAsArray($propertyBag);
 
+    // @fixme: Check if we still need to call the getBillingEmail function - eg. how does it handle "email-Primary".
     $email = $this->getBillingEmail($params, $propertyBag->getContactID());
+    $propertyBag->setEmail($email);
 
-    // See if we already have a stripe customer
+    $stripeCustomer = $this->getStripeCustomer($propertyBag);
+
     $customerParams = [
       'contact_id' => $propertyBag->getContactID(),
-      'processor_id' => $this->_paymentProcessor['id'],
-      'email' => $email,
-      // Include this to allow redirect within session on payment failure
-      'error_url' => $propertyBag->getCustomProperty('error_url'),
     ];
-
-    // Get the Stripe Customer:
-    //   1. Look for an existing customer.
-    //   2. If no customer (or a deleted customer found), create a new one.
-    //   3. If existing customer found, update the metadata that Stripe holds for this customer.
-    $stripeCustomerId = CRM_Stripe_Customer::find($customerParams);
-    // Customer not in civicrm database.  Create a new Customer in Stripe.
-    if (!isset($stripeCustomerId)) {
-      $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
-    }
-    else {
-      // Customer was found in civicrm database, fetch from Stripe.
-      try {
-        $stripeCustomer = $this->stripeClient->customers->retrieve($stripeCustomerId);
-      } catch (Exception $e) {
-        $err = self::parseStripeException('retrieve_customer', $e);
-        throw new PaymentProcessorException('Failed to retrieve Stripe Customer: ' . $err['code']);
-      }
-
-      if ($stripeCustomer->isDeleted()) {
-        // Customer doesn't exist, create a new one
-        CRM_Stripe_Customer::delete($customerParams);
-        try {
-          $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
-        } catch (Exception $e) {
-          // We still failed to create a customer
-          $err = self::parseStripeException('create_customer', $e);
-          throw new PaymentProcessorException('Failed to create Stripe Customer: ' . $err['code']);
-        }
-      }
-    }
 
     // Attach the paymentMethod to the customer and set as default for new invoices
     if (isset($paymentMethodID)) {
@@ -717,6 +685,56 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     // For contribution workflow we have a contributionId so we can set parameters directly.
     // For events/membership workflow we have to return the parameters and they might get set...
     return $this->endDoPayment($params);
+  }
+
+  /**
+   * @param \Civi\Payment\PropertyBag $propertyBag
+   *
+   * @return \Stripe\Customer|PropertySpy
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   */
+  protected function getStripeCustomer(\Civi\Payment\PropertyBag $propertyBag) {
+    // See if we already have a stripe customer
+    $customerParams = [
+      'contact_id' => $propertyBag->getContactID(),
+      'processor_id' => $this->getPaymentProcessor()['id'],
+      'email' => $propertyBag->getEmail(),
+      // Include this to allow redirect within session on payment failure
+      'error_url' => $propertyBag->getCustomProperty('error_url'),
+    ];
+
+    // Get the Stripe Customer:
+    //   1. Look for an existing customer.
+    //   2. If no customer (or a deleted customer found), create a new one.
+    //   3. If existing customer found, update the metadata that Stripe holds for this customer.
+    $stripeCustomerID = CRM_Stripe_Customer::find($customerParams);
+    // Customer not in civicrm database.  Create a new Customer in Stripe.
+    if (!isset($stripeCustomerID)) {
+      $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
+    }
+    else {
+      // Customer was found in civicrm database, fetch from Stripe.
+      try {
+        $stripeCustomer = $this->stripeClient->customers->retrieve($stripeCustomerID);
+      } catch (Exception $e) {
+        $err = self::parseStripeException('retrieve_customer', $e);
+        throw new PaymentProcessorException('Failed to retrieve Stripe Customer: ' . $err['code']);
+      }
+
+      if ($stripeCustomer->isDeleted()) {
+        // Customer doesn't exist, create a new one
+        CRM_Stripe_Customer::delete($customerParams);
+        try {
+          $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
+        } catch (Exception $e) {
+          // We still failed to create a customer
+          $err = self::parseStripeException('create_customer', $e);
+          throw new PaymentProcessorException('Failed to create Stripe Customer: ' . $err['code']);
+        }
+      }
+    }
+    return $stripeCustomer;
   }
 
   /**
