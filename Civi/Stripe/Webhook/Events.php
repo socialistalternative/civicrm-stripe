@@ -12,6 +12,7 @@
 
 namespace Civi\Stripe\Webhook;
 use Civi\Api4\Contribution;
+use Civi\Api4\ContributionRecur;
 use CRM_Stripe_ExtensionUtil as E;
 
 class Events {
@@ -185,7 +186,7 @@ class Events {
       return;
     }
 
-    $contributionRecur = \Civi\Api4\ContributionRecur::get(FALSE)
+    $contributionRecur = ContributionRecur::get(FALSE)
       ->addWhere('id', '=', $contributionRecurID)
       ->execute()
       ->first();
@@ -221,7 +222,7 @@ class Events {
     }
 
     // Get the recurring contribution record associated with the Stripe subscription.
-    $contributionRecur = \Civi\Api4\ContributionRecur::get(FALSE)
+    $contributionRecur = ContributionRecur::get(FALSE)
       ->addWhere('processor_id', '=', $subscriptionID)
       ->addWhere('is_test', 'IN', [TRUE, FALSE])
       ->execute()
@@ -388,15 +389,7 @@ class Events {
       return $return;
     }
 
-    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
-    if (!$paymentIntentID) {
-      $return->message = __FUNCTION__ . ' Missing payment_intent ID';
-      return $return;
-    }
-
-    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
-
-    $contribution = \Civi\Api4\Contribution::get(FALSE)
+    $contribution = Contribution::get(FALSE)
       ->addWhere('invoice_id', '=', $clientReferenceID)
       ->addWhere('is_test', 'IN', [TRUE, FALSE])
       ->execute()
@@ -406,10 +399,38 @@ class Events {
       return $return;
     }
 
-    \Civi\Api4\Contribution::update(FALSE)
+    // For one-off we have a paymentintentID
+    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
+    if (!$paymentIntentID) {
+      $return->message = __FUNCTION__ . ' Missing payment_intent ID';
+      return $return;
+    }
+
+    // For subscription we have invoice + subscription
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+
+    if (!empty($invoiceID)) {
+      $contributionTrxnID = $invoiceID;
+    }
+    elseif (!empty($paymentIntentID)) {
+      $contributionTrxnID = $paymentIntentID;
+    }
+    else {
+      $return->message = __FUNCTION__ . ' Missing invoiceID or paymentIntentID';
+      return $return;
+    }
+    Contribution::update(FALSE)
       ->addWhere('id', '=', $contribution['id'])
-      ->addValue('trxn_id', $paymentIntentID)
+      ->addValue('trxn_id', $contributionTrxnID)
       ->execute();
+
+    if (!empty($subscriptionID) && !empty($contribution['contribution_recur_id'])) {
+      ContributionRecur::update(FALSE)
+        ->addWhere('id', '=', $contribution['contribution_recur_id'])
+        ->addValue('processor_id', $subscriptionID)
+        ->execute();
+    }
 
     $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
     $return->ok = TRUE;
