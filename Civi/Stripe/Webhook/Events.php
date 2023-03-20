@@ -401,10 +401,6 @@ class Events {
 
     // For one-off we have a paymentintentID
     $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
-    if (!$paymentIntentID) {
-      $return->message = __FUNCTION__ . ' Missing payment_intent ID';
-      return $return;
-    }
 
     // For subscription we have invoice + subscription
     $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
