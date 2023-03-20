@@ -178,6 +178,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       // 'customer_email' => $propertyBag->getEmail(),
       'customer' => $stripeCustomerID,
       // 'submit_type' => one of 'auto', pay, book, donate
+      'client_reference_id' => $propertyBag->getInvoiceID(),
     ];
     $checkoutSession = $this->stripeClient->checkout->sessions->create($checkoutSessionParams);
 

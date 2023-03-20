@@ -160,7 +160,22 @@ class CRM_Stripe_Api {
             return (string) $stripeObject->customer;
         }
         break;
+
+      case 'checkout.session':
+        switch ($name) {
+          case 'payment_intent_id':
+            return (string) $stripeObject->payment_intent ?? '';
+
+          case 'checkout_session_id':
+            return (string) $stripeObject->id;
+
+          case 'client_reference_id':
+            return (string) $stripeObject->client_reference_id;
+        }
+        break;
+
     }
+
     return NULL;
   }
 

@@ -145,6 +145,41 @@ class Events {
   }
 
   /**
+   * For Stripe Checkout we set client_reference_id = civicrm invoice_id.
+   * Then we find the contribution by that ID when we get checkout.session.completed
+   *
+   * @param string $clientReferenceID
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   */
+  private function findContributionByClientReferenceID(string $clientReferenceID): array {
+    $paymentParams = [
+      'contribution_test' => $this->getPaymentProcessor()->getIsTestMode(),
+    ];
+
+    $paymentParams['invoice_id'] = $clientReferenceID;
+    $contributionApi3 = civicrm_api3('Mjwpayment', 'get_contribution', $paymentParams);
+
+    if (empty($contributionApi3['count'])) {
+      if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
+        $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . 'No matching contributions for event ' . $this->getEventID();
+        \Civi::log()->debug($message);
+      }
+      $result = [];
+      \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'contribution_not_found', $result);
+      if (empty($result['contribution'])) {
+        return [];
+      }
+      $contribution = $result['contribution'];
+    }
+    else {
+      $contribution = $contributionApi3['values'][$contributionApi3['id']];
+    }
+    return $contribution ?? [];
+  }
+
+  /**
    * @param string $chargeID
    *
    * @return float
@@ -361,21 +396,40 @@ class Events {
   /**
    * Webhook event: checkout.session.completed
    *
-   * @return void
+   * @return \stdClass
    */
-  public function doCheckoutSessionCompleted() {
+  public function doCheckoutSessionCompleted(): \stdClass {
     $return = $this->getResultObject();
 
-    $session = $this->getData()->object;
-    $subscriptionID = $this->getValueFromStripeObject('subscription', 'String');
-    $subscriptionID = $session->subscription;
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'checkout.session') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
 
-        # Find the subscription or save it to your database.
-        # invoice.paid may have fired before this so there
-        # could already be a subscription.
-        find_or_create_subscription($subscription_id);
-        http_response_code(200);
-        return;
+    // Invoice ID is required
+    $clientReferenceID = $this->getValueFromStripeObject('client_reference_id', 'String');
+    if (!$clientReferenceID) {
+      $return->message = __FUNCTION__ . ' Missing client_reference_id';
+      return $return;
+    }
+
+    $paymentIntentID = $this->getValueFromStripeObject('payment_intent', 'String');
+    if (!$paymentIntentID) {
+      $return->message = __FUNCTION__ . ' Missing payment_intent ID';
+      return $return;
+    }
+
+    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+
+    $contribution = $this->findContributionByClientReferenceID($clientReferenceID);
+    \Civi\Api4\Contribution::update(FALSE)
+      ->addWhere('id', '=', $contribution['id'])
+      ->addValue('trxn_id', $paymentIntentID)
+      ->execute();
+
+    $return->ok = TRUE;
+    return $return;
   }
 
   /**

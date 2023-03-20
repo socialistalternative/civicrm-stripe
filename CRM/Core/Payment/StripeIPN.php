@@ -398,6 +398,10 @@ class CRM_Core_Payment_StripeIPN {
       $webhookEventProcessor->setPaymentProcessor($this->getPaymentProcessor()->getID());
 
       switch ($this->eventType) {
+        case 'checkout.session.completed':
+          $return = $webhookEventProcessor->doCheckoutSessionCompleted();
+          break;
+
         case 'charge.refunded':
           $return = $webhookEventProcessor->doChargeRefunded();
           break;

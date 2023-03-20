@@ -255,6 +255,7 @@ class CRM_Stripe_Webhook {
       'charge.captured',
       'customer.subscription.updated',
       'customer.subscription.deleted',
+      'checkout.session.completed',
     ];
   }
 
