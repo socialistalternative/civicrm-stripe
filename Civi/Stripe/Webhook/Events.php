@@ -145,41 +145,6 @@ class Events {
   }
 
   /**
-   * For Stripe Checkout we set client_reference_id = civicrm invoice_id.
-   * Then we find the contribution by that ID when we get checkout.session.completed
-   *
-   * @param string $clientReferenceID
-   *
-   * @return array
-   * @throws \CRM_Core_Exception
-   */
-  private function findContributionByClientReferenceID(string $clientReferenceID): array {
-    $paymentParams = [
-      'contribution_test' => $this->getPaymentProcessor()->getIsTestMode(),
-    ];
-
-    $paymentParams['invoice_id'] = $clientReferenceID;
-    $contributionApi3 = civicrm_api3('Mjwpayment', 'get_contribution', $paymentParams);
-
-    if (empty($contributionApi3['count'])) {
-      if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
-        $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . 'No matching contributions for event ' . $this->getEventID();
-        \Civi::log()->debug($message);
-      }
-      $result = [];
-      \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'contribution_not_found', $result);
-      if (empty($result['contribution'])) {
-        return [];
-      }
-      $contribution = $result['contribution'];
-    }
-    else {
-      $contribution = $contributionApi3['values'][$contributionApi3['id']];
-    }
-    return $contribution ?? [];
-  }
-
-  /**
    * @param string $chargeID
    *
    * @return float
@@ -414,7 +379,7 @@ class Events {
       return $return;
     }
 
-    $paymentIntentID = $this->getValueFromStripeObject('payment_intent', 'String');
+    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
     if (!$paymentIntentID) {
       $return->message = __FUNCTION__ . ' Missing payment_intent ID';
       return $return;
@@ -422,12 +387,22 @@ class Events {
 
     $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
 
-    $contribution = $this->findContributionByClientReferenceID($clientReferenceID);
+    $contribution = \Civi\Api4\Contribution::get(FALSE)
+      ->addWhere('invoice_id', '=', $clientReferenceID)
+      ->addWhere('is_test', 'IN', [TRUE, FALSE])
+      ->execute()
+      ->first();
+    if (empty($contribution)) {
+      $return->message = __FUNCTION__ . ' contribution not found for client_reference_id';
+      return $return;
+    }
+
     \Civi\Api4\Contribution::update(FALSE)
       ->addWhere('id', '=', $contribution['id'])
       ->addValue('trxn_id', $paymentIntentID)
       ->execute();
 
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
     $return->ok = TRUE;
     return $return;
   }
