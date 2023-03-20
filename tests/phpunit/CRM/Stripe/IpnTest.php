@@ -51,7 +51,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
    */
   public function testNewOneOffChargeSucceeded() {
     $this->mockOneOffPaymentSetup();
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'charge.succeeded',
       'id'               => 'evt_mock',
       'object'           => 'event', // ?
@@ -71,6 +71,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
     $this->checkContrib([
@@ -85,7 +86,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
    */
   public function testNewOneOffChargeCaptured() {
     $this->mockOneOffPaymentSetup();
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'charge.captured',
       'id'               => 'evt_mock',
       'object'           => 'event', // ?
@@ -105,6 +106,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
     $this->checkContrib([
@@ -121,7 +123,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $doPaymentResult = $this->mockOneOffPaymentSetup();
 
     if ($doPaymentResult['payment_status'] === 'Completed') {
-      $result = civicrm_api3('Payment', 'create', [
+      civicrm_api3('Payment', 'create', [
         'trxn_id' => $doPaymentResult['trxn_id'],
         'total_amount' => $this->total,
         'fee_amount' => $doPaymentResult['fee_amount'],
@@ -130,7 +132,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       ]);
     }
 
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'charge.refunded',
       'id'               => 'evt_mock',
       'object'           => 'event', // ?
@@ -150,6 +152,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
     $this->checkContrib([
@@ -164,7 +167,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
    */
   public function testNewRecurringInvoicePaymentSucceeded() {
     $this->mockRecurringPaymentSetup();
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'invoice.payment_succeeded',
       'id'               => 'evt_mock',
       'object'           => 'event', // ?
@@ -203,7 +206,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
   public function testNewRecurringChargeSucceededAreIgnored() {
 
     $this->mockRecurringPaymentSetup();
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'charge.succeeded',
       'id'               => 'evt_mock',
       'object'           => 'event',
@@ -224,6 +227,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     //
     // Ensure Contribution and recur records remain as-was.
@@ -241,7 +245,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
 
     $this->mockRecurringPaymentSetup();
 
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'charge.failed',
       'id'               => 'evt_mock',
       'object'           => 'event',
@@ -263,6 +267,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
     //
     // Ensure Contribution is marked Failed, with the reason, and that the
     // ContributionRecur is not changed from Pending.
@@ -282,7 +288,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
 
     $this->mockRecurringPaymentSetup();
 
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'id'               => 'evt_mock',
       'object'           => 'event',
       'type'             => 'invoice.payment_failed',
@@ -302,6 +308,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     //
     // Ensure Contribution is marked Failed, with the reason, and that the
@@ -331,7 +338,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->testNewRecurringInvoicePaymentSucceeded();
 
     list ($mockCharge1, $mockCharge2, $mockInvoice2, $balanceTransaction2) = $this->getMocksForRecurringInvoiceFinalized();
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'invoice.finalized',
       'id'               => 'evt_mock_2',
       'object'           => 'event',
@@ -342,6 +349,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'object' => $mockInvoice2
       ],
     ], TRUE);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Recur should still be In Progress.
     $this->checkContribRecur([ 'contribution_status_id' => 'In Progress' ]);
@@ -401,7 +409,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     list ($mockCharge1, $mockCharge2, $mockInvoice2, $balanceTransaction2) = $this->getMocksForRecurringInvoiceFinalized();
 
     // Simulate payment_succeeded before we have had a invoice finalized.
-    $result = $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'invoice.payment_succeeded',
       'id'               => 'evt_mock_2',
       'object'           => 'event',
@@ -421,6 +429,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ], TRUE);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // We should have a new, Completed contribution.
     $contributions = $this->getContributionsAndAssertCount(2);
@@ -432,7 +441,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     ], $contrib2);
 
     // Now trigger invoice.finalized. We expect that it does nothing?
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'invoice.finalized',
       'id'               => 'evt_mock_3',
       'object'           => 'event',
@@ -443,6 +452,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'object' => $mockInvoice2
       ],
     ], TRUE);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Recur should still be In Progress.
     $this->checkContribRecur([ 'contribution_status_id' => 'In Progress' ]);
@@ -475,6 +485,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     // Initial payment comes in...
     $this->testNewRecurringInvoicePaymentSucceeded();
 
+    $createdTimestamp = time();
     //
     // Now test if we get invoice.finalized first.
     //
@@ -496,7 +507,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'amount'              => $this->total*100,
       'subscription' => 'sub_mock',
       'customer'     => 'cus_mock',
-      'created'      => time(),
+      'created'      => $createdTimestamp,
+      'failure_message' => 'payment failed',
     ]);
     $balanceTransaction2 = new PropertySpy('balance_transaction2', [
       'id'            => 'txn_mock_2',
@@ -526,7 +538,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     //
     // Simulate invoice.finalized
     //
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'invoice.finalized',
       'id'               => 'evt_mock_3',
       'object'           => 'event',
@@ -537,6 +549,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'object' => $mockInvoice2
       ],
     ], TRUE);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Recur should still be In Progress.
     $this->checkContribRecur([ 'contribution_status_id' => 'In Progress' ]);
@@ -552,7 +565,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     //
     // Now simulate a failed invoice again. (normal flow for a failed invoice)
     //
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'id'               => 'evt_mock_4',
       'object'           => 'event',
       'type'             => 'invoice.payment_failed',
@@ -564,19 +577,24 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'id'                  => 'in_mock_2',
           'object'              => 'invoice',
           'charge'              => 'ch_mock_2',
+          'subscription'        => 'sub_mock',
           'amount_due'          => $this->total*100,
           'amount_paid'         => 0,
           'customer'            => 'cus_mock',
-          'created'             => time(),
+          'created'             => $createdTimestamp,
           'status'              => 'uncollectible'
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
     // The 2nd contribution should be Failed
     $contributions = $this->getContributionsAndAssertCount(2);
     $this->checkContrib([
       'contribution_status_id' => 'Failed',
       'trxn_id' => 'in_mock_2',
+      'cancel_reason' => 'payment failed',
+      'cancel_date' => date('Y-m-d H:i:s', $createdTimestamp),
     ], $contributions[1]);
 
     //
@@ -615,7 +633,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ['ch_mock_3', NULL, NULL, $mockCharge3],
       ]));
 
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'id'               => 'evt_mock_5',
       'object'           => 'event',
       'type'             => 'invoice.payment_succeeded',
@@ -627,6 +645,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'id'          => 'in_mock_2', // still same invoice
           'object'      => 'invoice',
           'charge'      => 'ch_mock_3', // different charge
+          'subscription' => 'sub_mock',
           'amount_due'  => $this->total*100,
           'amount_paid' => 0,
           'customer'    => 'cus_mock',
@@ -635,6 +654,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
     // The 2nd contribution should now be Completed and have the invoice and the successful charge as its trxn_id
     $contributions = $this->getContributionsAndAssertCount(2);
     $this->checkContrib([
@@ -674,7 +695,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     //
     // Now test if we get customer.subscription.deleted .
     //
-    $this->simulateEvent([
+    $success = $this->simulateEvent([
       'type'             => 'customer.subscription.deleted',
       'id'               => 'evt_mock_2',
       'object'           => 'event',
@@ -685,6 +706,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'object' => $mockSubscription
       ],
     ], TRUE);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Recur should be Cancelled.
     $this->checkContribRecur( [

@@ -912,8 +912,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @return array $params
    */
   private function processPaymentIntent($params, $intent) {
-    $contactId = $params['contactID'];
-    $email = $this->getBillingEmail($params, $contactId);
+    $email = $this->getBillingEmail($params, $params['contactID']);
 
     try {
       if ($intent->status === 'requires_confirmation') {

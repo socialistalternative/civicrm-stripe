@@ -11,6 +11,8 @@
  */
 
 namespace Civi\Stripe\Webhook;
+use Civi\Api4\Contribution;
+use CRM_Stripe_ExtensionUtil as E;
 
 class Events {
 
@@ -105,7 +107,7 @@ class Events {
 
     // B2) Contribution linked to subscription and we have invoice_id
     // @todo there is a case where $contribution is not defined (i.e. if charge_id is empty)
-    if (!$contributionApi3['count']) {
+    if (empty($contributionApi3['count'])) {
       unset($paymentParams['trxn_id']);
       if (!empty($invoiceID)) {
         $paymentParams['order_reference'] = $invoiceID;
@@ -115,7 +117,7 @@ class Events {
 
     // B1) Contribution linked to subscription and we have subscription_id
     // @todo there is a case where $contribution is not defined (i.e. if charge_id, invoice_id are empty)
-    if (!$contributionApi3['count']) {
+    if (empty($contributionApi3['count'])) {
       unset($paymentParams['trxn_id']);
       if (!empty($subscriptionID)) {
         $paymentParams['order_reference'] = $subscriptionID;
@@ -124,7 +126,7 @@ class Events {
     }
 
     // @todo there is a case where $contribution is not defined (i.e. if charge_id, invoice_id, subscription_id are empty)
-    if (!$contributionApi3['count']) {
+    if (empty($contributionApi3['count'])) {
       if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
         $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . 'No matching contributions for event ' . $this->getEventID();
         \Civi::log()->debug($message);
@@ -139,7 +141,123 @@ class Events {
     else {
       $contribution = $contributionApi3['values'][$contributionApi3['id']];
     }
-    return $contribution;
+    return $contribution ?? [];
+  }
+
+  /**
+   * @param string $chargeID
+   *
+   * @return float
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  private function getFeeFromCharge(string $chargeID) {
+    if (($this->getData()->object['object'] !== 'charge') && (!empty($chargeID))) {
+      $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
+      $balanceTransactionID = \CRM_Stripe_Api::getObjectParam('balance_transaction', $charge);
+    }
+    else {
+      $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String');
+    }
+    return $this->getPaymentProcessor()->getFeeFromBalanceTransaction($balanceTransactionID, $this->getValueFromStripeObject('currency', 'String'));
+  }
+
+  /**
+   * This allows us to end a subscription once:
+   *   a) We've reached the end date / number of installments
+   *   b) The recurring contribution is marked as completed
+   *
+   * @throws \CiviCRM_API3_Exception
+   */
+  private function handleInstallmentsForSubscription(string $subscriptionID = '', int $contributionRecurID = NULL) {
+    // Check that we have both contributionRecurID and subscriptionID
+    if ((empty($contributionRecurID)) || (empty($subscriptionID))) {
+      return;
+    }
+
+    $contributionRecur = \Civi\Api4\ContributionRecur::get(FALSE)
+      ->addWhere('id', '=', $contributionRecurID)
+      ->execute()
+      ->first();
+
+    // Do we have an end date?
+    if (empty($contributionRecur['end_date'])) {
+      return;
+    }
+
+    // There is no easy way of retrieving a count of all invoices for a subscription so we ignore the "installments"
+    //   parameter for now and rely on checking end_date (which was calculated based on number of installments...)
+    // if (empty($contributionRecur['installments'])) { return; }
+
+    $stripeSubscription = $this->getPaymentProcessor()->stripeClient->subscriptions->retrieve($subscriptionID);
+    // If we've passed the end date cancel the subscription
+    if (($stripeSubscription->current_period_end >= strtotime($contributionRecur['end_date']))
+      || ($contributionRecur['contribution_status_id']
+        == \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_ContributionRecur', 'contribution_status_id', 'Completed'))) {
+      $this->getPaymentProcessor()->stripeClient->subscriptions->update($subscriptionID, ['cancel_at_period_end' => TRUE]);
+      $this->updateRecurCompleted(['id' => $contributionRecurID]);
+    }
+  }
+
+  /**
+   * Get the recurring contribution from the Stripe subscription ID
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   */
+  public function getRecurFromSubscriptionID($subscriptionID): array {
+    if (empty($subscriptionID)) {
+      return [];
+    }
+
+    // Get the recurring contribution record associated with the Stripe subscription.
+    $contributionRecur = \Civi\Api4\ContributionRecur::get(FALSE)
+      ->addWhere('processor_id', '=', $subscriptionID)
+      ->addWhere('is_test', 'IN', [TRUE, FALSE])
+      ->execute()
+      ->first();
+    if (empty($contributionRecur)) {
+      if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
+        $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . ': ' . $this->getEventID() . ': Cannot find recurring contribution for subscription ID: ' . $subscriptionID;
+        \Civi::log()->debug($message);
+      }
+      return [];
+    }
+
+    return $contributionRecur;
+  }
+
+  /**
+   * Create the next contribution for a recurring contribution
+   * This happens when Stripe generates a new invoice and notifies us (normally by invoice.finalized but
+   * invoice.payment_succeeded sometimes arrives first).
+   *
+   * @param string $chargeID
+   * @param string $invoiceID
+   * @param array $contributionRecur
+   *
+   * @return int
+   * @throws \CRM_Core_Exception
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  public function createNextContributionForRecur(string $chargeID, string $invoiceID, array $contributionRecur): int {
+    // We have a recurring contribution but no contribution so we'll repeattransaction
+    // Stripe has generated a new invoice (next payment in a subscription) so we
+    //   create a new contribution in CiviCRM
+    $repeatContributionParams = [
+      'contribution_recur_id' => $contributionRecur['id'],
+      'contribution_status_id' => \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending'),
+      'receive_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+      'order_reference' => $invoiceID,
+      'trxn_id' => $chargeID,
+      'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
+      'fee_amount' => $this->getFeeFromCharge($chargeID),
+    ];
+    return $this->repeatContribution($repeatContributionParams);
+    // Don't touch the contributionRecur as it's updated automatically by Contribution.repeattransaction
   }
 
   /**
@@ -195,6 +313,7 @@ class Events {
       foreach ($contribution['payments'] as $payment) {
         if ($payment['trxn_id'] === $refund->id) {
           $return->message = 'Refund ' . $refund->id . ' already recorded in CiviCRM';
+          $return->ok = TRUE;
           return $return;
         }
         if ($payment['trxn_id'] === $chargeID) {
