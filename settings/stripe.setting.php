@@ -12,16 +12,6 @@
 use CRM_Stripe_ExtensionUtil as E;
 
 return [
-  'stripe_upgrade66message' => [
-    'name' => 'stripe_upgrade66message',
-    'type' => 'Boolean',
-    'html_type' => 'checkbox',
-    'default' => 1,
-    'is_domain' => 1,
-    'is_contact' => 0,
-    'title' => E::ts('Show 6.6 upgrade message (system check)'),
-    'html_attributes' => [],
-  ],
   'stripe_oneoffreceipt' => [
     'name' => 'stripe_oneoffreceipt',
     'type' => 'Boolean',
