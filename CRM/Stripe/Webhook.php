@@ -27,20 +27,21 @@ class CRM_Stripe_Webhook {
    * @param bool $attemptFix If TRUE, try to fix the webhook.
    *
    * @throws \CRM_Core_Exception
-   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\API\Exception\UnauthorizedException
    */
   public function check(array &$messages, bool $attemptFix = FALSE) {
     $env = \Civi::settings()->get('environment');
     if ($env && $env !== 'Production') {
-      return;
+    //  return;
     }
-    $result = civicrm_api3('PaymentProcessor', 'get', [
-      'class_name' => 'Payment_Stripe',
-      'is_active' => 1,
-      'domain_id' => CRM_Core_Config::domainID(),
-    ]);
+    $paymentProcessors = \Civi\Api4\PaymentProcessor::get(FALSE)
+      ->addWhere('class_name', 'LIKE', 'Payment_Stripe%')
+      ->addWhere('is_active', '=', TRUE)
+      ->addWhere('domain_id', '=', 'current_domain')
+      ->addWhere('is_test', 'IN', [TRUE, FALSE])
+      ->execute();
 
-    foreach ($result['values'] as $paymentProcessor) {
+    foreach ($paymentProcessors as $paymentProcessor) {
       $webhook_path = self::getWebhookPath($paymentProcessor['id']);
       $processor = \Civi\Payment\System::singleton()->getById($paymentProcessor['id']);
       if ($processor->stripeClient === NULL) {
