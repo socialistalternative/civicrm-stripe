@@ -59,6 +59,9 @@ class CRM_Stripe_Api {
           case 'currency':
             return (string) mb_strtoupper($stripeObject->currency);
 
+          case 'payment_intent_id':
+            return (string) $stripeObject->payment_intent;
+
         }
         break;
 

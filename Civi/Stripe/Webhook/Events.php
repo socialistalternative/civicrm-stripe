@@ -271,6 +271,85 @@ class Events {
   }
 
   /**
+   * We process charge.succeeded per charge.captured
+   *
+   * @return \stdClass
+   * @throws \CRM_Core_Exception
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  public function doChargeSucceeded(): \stdClass {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'charge') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    // For a recurring contribution we can process charge.succeeded once we receive the event with an invoice ID.
+    // For a single contribution we can't process charge.succeeded because it only triggers BEFORE the charge is captured
+    if (empty($this->getValueFromStripeObject('customer_id', 'String'))) {
+      $return->message = __FUNCTION__ . ' not processing because no customer_id';
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    if (!$chargeID) {
+      $return->message = __FUNCTION__ . ' Missing charge_id';
+      return $return;
+    }
+    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+
+    $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
+    if (empty($contribution)) {
+      $return->message = __FUNCTION__ . ' ignoring - contribution not found';
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // For a single contribution we have to use charge.captured because it has the customer_id.
+
+    // We only process charge.captured for one-off contributions (see invoice.paid/invoice.payment_succeeded for recurring)
+    if (!empty($contribution['contribution_recur_id'])) {
+      $return->message = __FUNCTION__ . ' ignoring - contribution has recur';
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // We only process charge.captured for one-off contributions
+    if (empty($this->getValueFromStripeObject('captured', 'Boolean'))) {
+      $return->message = __FUNCTION__ . ' ignoring - charge not captured';
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    $pendingContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+    $failedContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+    $statusesAllowedToComplete = [$pendingContributionStatusID, $failedContributionStatusID];
+
+    // If contribution is in Pending or Failed state record payment and transition to Completed
+    if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
+      $contributionParams = [
+        'contribution_id' => $contribution['id'],
+        'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+        'order_reference' => $invoiceID ?? $chargeID,
+        'trxn_id' => $chargeID,
+        'total_amount' => $this->getValueFromStripeObject('amount', 'Float'),
+        'fee_amount' => $this->getFeeFromCharge($chargeID),
+      ];
+      $this->updateContributionCompleted($contributionParams);
+    }
+
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->ok = TRUE;
+    return $return;
+  }
+
+  /**
    * Process the charge.refunded event from Stripe
    *
    * @return \stdClass
@@ -279,12 +358,12 @@ class Events {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \Stripe\Exception\ApiErrorException
    */
-  public function doChargeRefunded() {
+  public function doChargeRefunded(): \stdClass {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'charge') {
-      $return->message = 'doChargeRefunded Invalid object type';
+      $return->message = __FUNCTION__ . ' Invalid object type';
       return $return;
     }
 
@@ -297,7 +376,7 @@ class Events {
     // Charge ID is required
     $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
     if (!$chargeID) {
-      $return->message = 'doChargeRefunded Missing charge_id';
+      $return->message = __FUNCTION__ . ' Missing charge_id';
       return $return;
     }
 
@@ -315,7 +394,7 @@ class Events {
     // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
     $contribution = $this->findContribution($chargeID, $invoiceID);
     if (empty($contribution)) {
-      $return->message = 'doChargeRefunded Contribution not found';
+      $return->message = __FUNCTION__ . ' Contribution not found';
       return $return;
     }
 

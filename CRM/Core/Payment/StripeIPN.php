@@ -402,6 +402,11 @@ class CRM_Core_Payment_StripeIPN {
           $return = $webhookEventProcessor->doCheckoutSessionCompleted();
           break;
 
+        case 'charge.succeeded':
+        case 'charge.captured':
+          $return = $webhookEventProcessor->doChargeSucceeded();
+          break;
+
         case 'charge.refunded':
           $return = $webhookEventProcessor->doChargeRefunded();
           break;
@@ -467,78 +472,6 @@ class CRM_Core_Payment_StripeIPN {
 
     // NOTE: If you add an event here make sure you add it to the webhook or it will never be received!
     switch($this->eventType) {
-      case 'invoice.finalized':
-        // An invoice has been created and finalized (ready for payment)
-        // This usually happens automatically through a Stripe subscription
-        if (!$this->setInfo()) {
-          // Unable to find a Contribution.
-          if (!$this->contribution_recur_id) {
-            // We don't have a matching contribution or a recurring contribution - this was probably created outside of CiviCRM
-            // @todo In the future we may want to match the customer->contactID and create a contribution to match.
-            return TRUE;
-          }
-          else {
-            $this->createNextContributionForRecur();
-          }
-          return TRUE;
-        }
-        // For a future recur start date we setup the initial contribution with the
-        // Stripe subscriptionID because we didn't have an invoice.
-        // Now we do we can map subscription_id to invoice_id so payment can be recorded
-        // via subsequent IPN requests (eg. invoice.payment_succeeded)
-        if ($this->contribution['trxn_id'] === $this->subscription_id) {
-          $this->updateContribution([
-            'contribution_id' => $this->contribution['id'],
-            'trxn_id' => $this->invoice_id,
-          ]);
-        }
-        break;
-
-      case 'invoice.payment_succeeded':
-        // Successful recurring payment. Either we are completing an existing contribution or it's the next one in a subscription
-        //
-        // We *normally/ideally* expect to be able to find the contribution via setInfo(),
-        // since the logical order of events would be invoice.finalized first which
-        // creates a contribution; then invoice.payment_succeeded following, which would
-        // find it.
-        if (!$this->setInfo()) {
-          // We were unable to locate the Contribution; it could be the next one in a subscription.
-          if (!$this->contribution_recur_id) {
-            // Hmmm. We could not find the contribution recur record either. Silently ignore this event(!)
-            return TRUE;
-          }
-          else {
-            // We have a recurring contribution but have not yet received invoice.finalized so we don't have the next contribution yet.
-            // invoice.payment_succeeded sometimes comes before invoice.finalized so trigger the same behaviour here to create a new contribution
-            $this->createNextContributionForRecur();
-            // Now get the contribution we just created.
-            $this->getContribution();
-          }
-        }
-        if (civicrm_api3('Mjwpayment', 'get_payment', [
-            'trxn_id' => $this->charge_id,
-            'status_id' => 'Completed',
-          ])['count'] > 0) {
-          // Payment already recorded
-          return TRUE;
-        }
-
-        // If contribution is in Pending or Failed state record payment and transition to Completed
-        if (in_array($this->contribution['contribution_status_id'], $statusesAllowedToComplete)) {
-          $params = [
-            'contribution_id' => $this->contribution['id'],
-            'trxn_date' => $this->receive_date,
-            'order_reference' => $this->invoice_id,
-            'trxn_id' => $this->charge_id,
-            'total_amount' => $this->amount,
-            'fee_amount' => $this->fee,
-            'contribution_status_id' => $this->contribution['contribution_status_id'],
-          ];
-          $this->updateContributionCompleted($params);
-          // Don't touch the contributionRecur as it's updated automatically by Contribution.completetransaction
-        }
-        $this->handleInstallmentsForSubscription();
-        return TRUE;
 
       // One-time donation and per invoice payment.
       case 'charge.failed':
@@ -559,47 +492,6 @@ class CRM_Core_Payment_StripeIPN {
           'cancel_reason' => $this->retrieve('failure_message', 'String'),
         ];
         $this->updateContributionFailed($params);
-        return TRUE;
-
-      // case 'charge.refunded': Handled via doChargeRefunded();
-
-      case 'charge.succeeded':
-        // For a recurring contribution we can process charge.succeeded once we receive the event with an invoice ID.
-        // For a single contribution we can't process charge.succeeded because it only triggers BEFORE the charge is captured
-        if (empty(CRM_Stripe_Api::getObjectParam('customer_id', $this->getData()->object))) {
-          return TRUE;
-        }
-
-      // Deliberately missing break here because we process charge.succeeded per charge.captured
-      case 'charge.captured':
-        // For a single contribution we have to use charge.captured because it has the customer_id.
-        if (!$this->setInfo()) {
-          return TRUE;
-        }
-
-        // We only process charge.captured for one-off contributions (see invoice.paid/invoice.payment_succeeded for recurring)
-        if (!empty($this->contribution['contribution_recur_id'])) {
-          return TRUE;
-        }
-
-        // We only process charge.captured for one-off contributions
-        if (empty(CRM_Stripe_Api::getObjectParam('captured', $this->getData()->object))) {
-          return TRUE;
-        }
-
-        // If contribution is in Pending or Failed state record payment and transition to Completed
-        if (in_array($this->contribution['contribution_status_id'], $statusesAllowedToComplete)) {
-          $params = [
-            'contribution_id' => $this->contribution['id'],
-            'trxn_date' => $this->receive_date,
-            'order_reference' => $this->invoice_id ?? $this->charge_id,
-            'trxn_id' => $this->charge_id,
-            'total_amount' => $this->amount,
-            'fee_amount' => $this->fee,
-            'contribution_status_id' => $this->contribution['contribution_status_id'],
-          ];
-          $this->updateContributionCompleted($params);
-        }
         return TRUE;
 
       case 'customer.subscription.updated':
