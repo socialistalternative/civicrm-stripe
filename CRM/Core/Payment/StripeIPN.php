@@ -402,6 +402,19 @@ class CRM_Core_Payment_StripeIPN {
           $return = $webhookEventProcessor->doChargeRefunded();
           break;
 
+        case 'invoice.payment_failed':
+          $return = $webhookEventProcessor->doInvoicePaymentFailed();
+          break;
+
+        case 'invoice.finalized':
+          $return = $webhookEventProcessor->doInvoiceFinalized();
+          break;
+
+        case 'invoice.paid':
+        case 'invoice.payment_succeeded':
+          $return = $webhookEventProcessor->doInvoicePaid();
+          break;
+
         default:
           $return->ok = $this->processEventType();
       }
@@ -521,33 +534,6 @@ class CRM_Core_Payment_StripeIPN {
           // Don't touch the contributionRecur as it's updated automatically by Contribution.completetransaction
         }
         $this->handleInstallmentsForSubscription();
-        return TRUE;
-
-      case 'invoice.payment_failed':
-        // Failed recurring payment. Either we are failing an existing contribution or it's the next one in a subscription
-        if (!$this->setInfo()) {
-          return TRUE;
-        }
-
-        if ($this->contribution['contribution_status_id'] == $pendingContributionStatusID) {
-          // If this contribution is Pending, set it to Failed.
-
-          // To obtain the failure_message we need to look up the charge object
-          $failureMessage = '';
-          if ($this->charge_id) {
-            $stripeCharge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($this->charge_id);
-            $failureMessage = CRM_Stripe_Api::getObjectParam('failure_message', $stripeCharge);
-            $failureMessage = is_string($failureMessage) ? $failureMessage : '';
-          }
-
-          $params = [
-            'contribution_id' => $this->contribution['id'],
-            'order_reference' => $this->invoice_id,
-            'cancel_date' => $this->receive_date,
-            'cancel_reason'   => $failureMessage,
-          ];
-          $this->updateContributionFailed($params);
-        }
         return TRUE;
 
       // One-time donation and per invoice payment.

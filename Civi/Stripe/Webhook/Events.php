@@ -347,12 +347,272 @@ class Events {
     ]);
     if (!empty($refundPayment['count'])) {
       $return->message = 'OK - refund already recorded';
+      $return->ok = TRUE;
     }
     else {
       $this->updateContributionRefund($refundParams);
       $return->message = 'OK - refund recorded';
+      $return->ok = TRUE;
     }
     $lock->release();
+    return $return;
+  }
+
+  /**
+   * Webhook event: checkout.session.completed
+   *
+   * @return void
+   */
+  public function doCheckoutSessionCompleted() {
+    $return = $this->getResultObject();
+
+    $session = $this->getData()->object;
+    $subscriptionID = $this->getValueFromStripeObject('subscription', 'String');
+    $subscriptionID = $session->subscription;
+
+        # Find the subscription or save it to your database.
+        # invoice.paid may have fired before this so there
+        # could already be a subscription.
+        find_or_create_subscription($subscription_id);
+        http_response_code(200);
+        return;
+  }
+
+  /**
+   * Webhook event: invoice.paid
+   * Invoice changed to paid. This is nearly identical to invoice.payment_succeeded
+   *
+   * The invoice.payment_successful type Event object is created and sent to any webhook endpoints configured
+   *   to accept that type of Event when the PaymentIntent powering the payment of an Invoice is used successfully.
+   * The invoice.paid type Event object is created and sent to any webhook endpoints configured to accept that
+   *   type of Event when the Invoice object has its paid property modified to a "true" value
+   *   (see https://stripe.com/docs/api/invoices/object#invoice_object-paid).
+   *
+   * Successful recurring payment. Either we are completing an existing contribution or it's the next one in a subscription
+   *
+   * @return \stdClass
+   * @throws \CRM_Core_Exception
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   */
+  public function doInvoicePaid() {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    // Invoice ID is required
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    if (!$invoiceID) {
+      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      return $return;
+    }
+
+    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
+    if (empty($contributionRecur)) {
+      $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // Acquire the lock to find/create contribution
+    $lock = \Civi::lockManager()->acquire('data.contribute.contribution.' . $invoiceID);
+    if (!$lock->isAcquired()) {
+      \Civi::log()->error('Could not acquire lock to record ' . $this->getEventType() . ' for Stripe InvoiceID: ' . $invoiceID);
+    }
+
+    // We *normally/ideally* expect to be able to find the contribution,
+    // since the logical order of events would be invoice.finalized first which
+    // creates a contribution; then invoice.payment_succeeded/paid following, which would
+    // find it.
+    $contribution = $this->findContribution($chargeID, $invoiceID, $subscriptionID);
+    if (empty($contribution)) {
+      // We were unable to locate the Contribution; it could be the next one in a subscription.
+      if (empty($contributionRecur['id'])) {
+        // Hmmm. We could not find the contribution recur record either. Silently ignore this event(!)
+        $return->ok = TRUE;
+        $return->message = __FUNCTION__ . ': ' . E::ts('No contribution or recur record found in CiviCRM. Ignored.');
+        return $return;
+      }
+      else {
+        // We have a recurring contribution but have not yet received invoice.finalized so we don't have the next contribution yet.
+        // invoice.payment_succeeded sometimes comes before invoice.finalized so trigger the same behaviour here to create a new contribution
+
+        $contributionID = $this->createNextContributionForRecur($chargeID, $invoiceID, $contributionRecur);
+        // Now get the contribution we just created.
+        $contribution = Contribution::get(FALSE)
+          ->addWhere('id', '=', $contributionID)
+          ->execute()
+          ->first();
+      }
+    }
+    // Release the lock to find/create contribution
+    $lock->release();
+
+    // Now acquire lock to record payment on the contribution
+    $lock = \Civi::lockManager()->acquire('data.contribute.contribution.' . $contribution['id']);
+    if (!$lock->isAcquired()) {
+      \Civi::log()->error('Could not acquire lock to record ' . $this->getEventType() . ' for contribution: ' . $contribution['id']);
+    }
+
+    // By this point we should have a contribution
+    if (civicrm_api3('Mjwpayment', 'get_payment', [
+        'trxn_id' => $chargeID,
+        'status_id' => 'Completed',
+      ])['count'] > 0) {
+      // Payment already recorded
+      $return->ok = TRUE;
+      $return->message = E::ts('Payment already recorded');
+      return $return;
+    }
+
+    $pendingContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+    $failedContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+    $statusesAllowedToComplete = [$pendingContributionStatusID, $failedContributionStatusID];
+
+    // If contribution is in Pending or Failed state record payment and transition to Completed
+    if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
+      $contributionParams = [
+        'contribution_id' => $contribution['id'],
+        'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+        'order_reference' => $invoiceID,
+        'trxn_id' => $chargeID,
+        'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
+        'fee_amount' => $this->getFeeFromCharge($chargeID),
+        'contribution_status_id' => $contribution['contribution_status_id'],
+      ];
+      $this->updateContributionCompleted($contributionParams);
+      // Don't touch the contributionRecur as it's updated automatically by Contribution.completetransaction
+    }
+    $lock->release();
+
+    $this->handleInstallmentsForSubscription($subscriptionID, $contributionRecur['id']);
+    $return->ok = TRUE;
+    return $return;
+  }
+
+  /**
+   * invoice.finalized
+   *
+   * @return \stdClass
+   * @throws \CRM_Core_Exception
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  public function doInvoiceFinalized() {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    // Invoice ID is required
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    if (!$invoiceID) {
+      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      return $return;
+    }
+
+    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
+    if (empty($contributionRecur)) {
+      $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    $contribution = $this->findContribution($chargeID, $invoiceID, $subscriptionID);
+
+    // An invoice has been created and finalized (ready for payment)
+    // This usually happens automatically through a Stripe subscription
+    if (empty($contribution)) {
+      // Unable to find a Contribution.
+      $this->createNextContributionForRecur($chargeID, $invoiceID, $contributionRecur);
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // For a future recur start date we setup the initial contribution with the
+    // Stripe subscriptionID because we didn't have an invoice.
+    // Now we do we can map subscription_id to invoice_id so payment can be recorded
+    // via subsequent IPN requests (eg. invoice.payment_succeeded)
+    if ($contribution['trxn_id'] === $subscriptionID) {
+      $this->updateContribution([
+        'contribution_id' => $contribution['id'],
+        'trxn_id' => $invoiceID,
+      ]);
+    }
+    $return->ok = TRUE;
+    return $return;
+  }
+
+  /**
+   * Webhook event: invoice.payment_failed
+   * Failed recurring payment. Either we are failing an existing contribution or it's the next one in a subscription
+   *
+   * @return \stdClass
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  public function doInvoicePaymentFailed() {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    // Invoice ID is required
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    if (!$invoiceID) {
+      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      return $return;
+    }
+
+    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+
+    // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
+    $contribution = $this->findContribution($chargeID, $invoiceID);
+    if (empty($contribution)) {
+      $return->message = __FUNCTION__ . ' Contribution not found';
+      return $return;
+    }
+
+    $pendingContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
+
+    if ($contribution['contribution_status_id'] == $pendingContributionStatusID) {
+      // If this contribution is Pending, set it to Failed.
+
+      // To obtain the failure_message we need to look up the charge object
+      $failureMessage = '';
+
+      if ($chargeID) {
+        $stripeCharge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
+        $failureMessage = \CRM_Stripe_Api::getObjectParam('failure_message', $stripeCharge);
+        $failureMessage = is_string($failureMessage) ? $failureMessage : '';
+      }
+
+      $receiveDate = $this->getValueFromStripeObject('receive_date', 'String');
+      $params = [
+        'contribution_id' => $contribution['id'],
+        'order_reference' => $invoiceID,
+        'cancel_date' => $receiveDate,
+        'cancel_reason'   => $failureMessage,
+      ];
+      $this->updateContributionFailed($params);
+    }
+    $return->ok = TRUE;
     return $return;
   }
 

@@ -187,6 +187,43 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         ]
       ],
     ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
+    // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
+    $this->checkContrib([
+      'contribution_status_id' => 'Completed',
+      'trxn_id'                => 'ch_mock',
+    ]);
+    $this->checkContribRecur(['contribution_status_id' => 'In Progress']);
+  }
+
+  /**
+   * Test creating a recurring contribution and
+   * update it after creation. @todo The membership should also be updated.
+   */
+  public function testNewRecurringInvoicePaid() {
+    $this->mockRecurringPaymentSetup();
+    $success = $this->simulateEvent([
+      'type'             => 'invoice.paid',
+      'id'               => 'evt_mock',
+      'object'           => 'event', // ?
+      'livemode'         => FALSE,
+      'pending_webhooks' => 0,
+      'request'          => [ 'id' => NULL ],
+      'data'             => [
+        'object' => [
+          'id'           => 'in_mock',
+          'object'       => 'invoice',
+          'subscription' => 'sub_mock',
+          'customer'     => 'cus_mock',
+          'charge'       => 'ch_mock',
+          'created'      => time(),
+          'amount_due'   => $this->total*100,
+          'status'      => 'paid',
+        ]
+      ],
+    ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
     // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
     $this->checkContrib([
