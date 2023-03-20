@@ -42,4 +42,27 @@ return [
       ],
     ],
   ],
+  1 => [
+    'name' => 'StripeCheckout',
+    'entity' => 'PaymentProcessorType',
+    'params' => [
+      'version' => 3,
+      'name' => 'StripeCheckout',
+      'title' => 'Stripe Checkout',
+      'description' => 'Stripe Checkout Payment Processor',
+      'class_name' => 'Payment_StripeCheckout',
+      'user_name_label' => 'Publishable key',
+      'password_label' => 'Secret Key',
+      'signature_label' => 'Webhook Secret',
+      'url_site_default' => 'http://unused.com',
+      'url_site_test_default' => 'http://unused.com',
+      'billing_mode' => 1,
+      'payment_type' => 1,
+      'is_recur' => 1,
+    ],
+    'match' => [
+      'name',
+    ],
+  ],
+
 ];
