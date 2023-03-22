@@ -53,6 +53,11 @@ class CRM_Core_Payment_StripeIPN {
   protected $customer_id = NULL;
 
   /**
+   * @var string The Stripe PaymentIntent ID
+   */
+  protected $payment_intent_id = NULL;
+
+  /**
    * @var string The Stripe Charge ID
    */
   protected $charge_id = NULL;
@@ -215,6 +220,7 @@ class CRM_Core_Payment_StripeIPN {
     }
 
     $this->charge_id = $this->retrieve('charge_id', 'String', FALSE);
+    $this->payment_intent_id = $this->retrieve('payment_intent_id', 'String', FALSE);
 
     $this->setInputParametersHasRun = TRUE;
   }
@@ -246,7 +252,7 @@ class CRM_Core_Payment_StripeIPN {
    * @return string
    */
   private function getWebhookUniqueIdentifier() {
-    return "{$this->charge_id}:{$this->invoice_id}:{$this->subscription_id}";
+    return "{$this->payment_intent_id}:{$this->charge_id}:{$this->invoice_id}:{$this->subscription_id}";
   }
 
   /**
@@ -437,7 +443,7 @@ class CRM_Core_Payment_StripeIPN {
       if ($this->exceptionOnFailure) {
         // Re-throw a modified exception. (Special case for phpunit testing).
         $return->message = get_class($e) . ": " . $e->getMessage();
-        throw new PaymentProcessorException($return->message, $e->getCode(), $e);
+        throw new PaymentProcessorException($return->message, $e->getCode());
       }
       else {
         // Normal use.

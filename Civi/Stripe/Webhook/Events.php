@@ -564,7 +564,31 @@ class Events {
         ->execute();
     }
 
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    // charge.succeeded often arrives before checkout.session.completed and we have no way
+    //   to match it to a contribution so it will be ignored.
+    // Now we have processed checkout.session.completed see if we need to process
+    //   charge.succeeded again.
+    $chargeSucceededWebhook = \Civi\Api4\PaymentprocessorWebhook::get(FALSE)
+      ->addSelect('id')
+      ->addWhere('identifier', 'CONTAINS', $paymentIntentID)
+      ->addWhere('trigger', '=', 'charge.succeeded')
+      ->addWhere('status', '=', 'success')
+      ->addOrderBy('created_date', 'DESC')
+      ->execute()
+      ->first();
+    if (!empty($chargeSucceededWebhook)) {
+      // Flag charge.succeeded for re-processing
+      \Civi\Api4\PaymentprocessorWebhook::update(FALSE)
+        ->addValue('status', 'new')
+        ->addValue('processed_date', NULL)
+        ->addWhere('id', '=', $chargeSucceededWebhook['id'])
+        ->execute();
+      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'] . ' charge.succeeded flagged for re-process';
+    }
+    else {
+      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    }
+
     $return->ok = TRUE;
     return $return;
   }

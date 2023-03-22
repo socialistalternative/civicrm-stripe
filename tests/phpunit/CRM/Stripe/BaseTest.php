@@ -80,7 +80,10 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
   public function setUp(): void {
     civicrm_api3('Extension', 'install', ['keys' => 'com.drastikbydesign.stripe']);
     require_once('vendor/stripe/stripe-php/init.php');
-    $this->createPaymentProcessor();
+    // Create Stripe Checkout processor
+    $this->setOrCreateStripeCheckoutPaymentProcessor();
+    // Create Stripe processor
+    $this->setOrCreateStripePaymentProcessor();
     $this->createContact();
     $this->created_ts = time();
   }
@@ -121,12 +124,53 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
    * Create a stripe payment processor.
    *
    */
-  function createPaymentProcessor($params = []) {
-    $result = civicrm_api3('Stripe', 'setuptest', $params);
-    $processor = array_pop($result['values']);
-    $this->paymentProcessor = $processor;
-    $this->paymentProcessorID = $result['id'];
-    $this->paymentObject = \Civi\Payment\System::singleton()->getById($result['id']);
+  function createPaymentProcessor($overrideParams = []) {
+    $params = array_merge([
+      'name' => 'Stripe',
+      'domain_id' => 'current_domain',
+      'payment_processor_type_id:name' => 'Stripe',
+      'title' => 'Stripe',
+      'is_active' => 1,
+      'is_default' => 0,
+      'is_test' => 1,
+      'is_recur' => 1,
+      'user_name' => 'pk_test_k2hELLGpBLsOJr6jZ2z9RaYh',
+      'password' => 'sk_test_TlGdeoi8e1EOPC3nvcJ4q5UZ',
+      'class_name' => 'Payment_Stripe',
+      'billing_mode' => 1,
+      'payment_instrument_id' => 1,
+    ], $overrideParams);
+
+    // First see if it already exists.
+    $paymentProcessor = \Civi\Api4\PaymentProcessor::get(FALSE)
+      ->addWhere('class_name', '=', $params['class_name'])
+      ->addWhere('is_test', '=', $params['is_test'])
+      ->execute()
+      ->first();
+    if (empty($paymentProcessor)) {
+      // Nope, create it.
+      $paymentProcessor = \Civi\Api4\PaymentProcessor::create(FALSE)
+        ->setValues($params)
+        ->execute()
+        ->first();
+    }
+
+    $this->paymentProcessor = $paymentProcessor;
+    $this->paymentProcessorID = $paymentProcessor['id'];
+    $this->paymentObject = \Civi\Payment\System::singleton()->getById($paymentProcessor['id']);
+  }
+
+  public function setOrCreateStripeCheckoutPaymentProcessor() {
+    $this->createPaymentProcessor([
+      'name' => 'StripeCheckout',
+      'payment_processor_type_id:name' => 'StripeCheckout',
+      'title' => 'Stripe Checkout',
+      'class_name' => 'Payment_StripeCheckout',
+    ]);
+  }
+
+  public function setOrCreateStripePaymentProcessor() {
+    $this->createPaymentProcessor();
   }
 
   /**
@@ -140,7 +184,7 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \Stripe\Exception\ApiErrorException
    */
-  public function doPayment(array $params = []): array {
+  public function doPaymentStripe(array $params = []): array {
     // Send in credit card to get payment method. xxx mock here
     $paymentMethod = $this->paymentObject->stripeClient->paymentMethods->create([
       'type' => 'card',
@@ -243,8 +287,13 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
 
   /**
    * Create contribition
+   *
+   * @param array $params
+   *
+   * @return array The created contribution
+   * @throws \CRM_Core_Exception
    */
-  public function setupTransaction($params = []) {
+  public function setupPendingContribution($params = []): array {
      $contribution = civicrm_api3('contribution', 'create', array_merge([
       'contact_id' => $this->contactID,
       'payment_processor_id' => $this->paymentProcessorID,
@@ -256,7 +305,12 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
       'is_test' => 1,
      ], $params));
     $this->assertEquals(0, $contribution['is_error']);
+    $contribution = \Civi\Api4\Contribution::get(FALSE)
+      ->addWhere('id', '=', $contribution['id'])
+      ->execute()
+      ->first();
     $this->contributionID = $contribution['id'];
+    return $contribution;
   }
 
   /**
