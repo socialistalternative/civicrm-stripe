@@ -411,6 +411,10 @@ class CRM_Core_Payment_StripeIPN {
           $return = $webhookEventProcessor->doChargeRefunded();
           break;
 
+        case 'charge.failed':
+          $return = $webhookEventProcessor->doChargeFailed();
+          break;
+
         case 'invoice.payment_failed':
           $return = $webhookEventProcessor->doInvoicePaymentFailed();
           break;
@@ -466,34 +470,8 @@ class CRM_Core_Payment_StripeIPN {
    * @throws \Stripe\Exception\ApiErrorException
    */
   private function processEventType() {
-    $pendingContributionStatusID = (int) CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
-    $failedContributionStatusID = (int) CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
-    $statusesAllowedToComplete = [$pendingContributionStatusID, $failedContributionStatusID];
-
     // NOTE: If you add an event here make sure you add it to the webhook or it will never be received!
     switch($this->eventType) {
-
-      // One-time donation and per invoice payment.
-      case 'charge.failed':
-        // If we don't have a customer_id we can't do anything with it!
-        // It's quite likely to be a fraudulent/spam so we ignore.
-        if (empty(CRM_Stripe_Api::getObjectParam('customer_id', $this->getData()->object))) {
-          return TRUE;
-        }
-
-        if (!$this->setInfo()) {
-          // We could not find this contribution.
-          return TRUE;
-        }
-        $params = [
-          'contribution_id' => $this->contribution['id'],
-          'order_reference' => $this->invoice_id ?? $this->charge_id,
-          'cancel_date' => $this->receive_date,
-          'cancel_reason' => $this->retrieve('failure_message', 'String'),
-        ];
-        $this->updateContributionFailed($params);
-        return TRUE;
-
       case 'customer.subscription.updated':
         // Subscription is updated. This used to be "implemented" but didn't work
         return TRUE;

@@ -271,6 +271,7 @@ class Events {
   }
 
   /**
+   * Webhook event: charge.succeeded / charge.captured
    * We process charge.succeeded per charge.captured
    *
    * @return \stdClass
@@ -350,6 +351,7 @@ class Events {
   }
 
   /**
+   * Webhook event: charge.refunded
    * Process the charge.refunded event from Stripe
    *
    * @return \stdClass
@@ -435,16 +437,71 @@ class Events {
       'total_amount' => $refundParams['total_amount'],
     ]);
     if (!empty($refundPayment['count'])) {
-      $return->message = 'OK - refund already recorded. Contribution ID: ' . $contribution['id'];
+      $return->message = __FUNCTION__ . ' Refund already recorded. Contribution ID: ' . $contribution['id'];
       $return->ok = TRUE;
     }
     else {
       $this->updateContributionRefund($refundParams);
-      $return->message = 'OK - refund recorded. Contribution ID: ' . $contribution['id'];
+      $return->message = __FUNCTION__ . 'Refund recorded. Contribution ID: ' . $contribution['id'];
       $return->ok = TRUE;
     }
     $lock->release();
     return $return;
+  }
+
+  /**
+   * Webhook event: charge.failed
+   * One-time donation and per invoice payment
+   *
+   * @return \stdClass
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   */
+  public function doChargeFailed(): \stdClass {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'charge') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    // If we don't have a customer_id we can't do anything with it!
+    // It's quite likely to be a fraudulent/spam so we ignore.
+    if (empty($this->getValueFromStripeObject('customer_id', 'String'))) {
+      $return->message = __FUNCTION__ . ' ignoring - no customer_id';
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // Charge ID is required
+    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    if (!$chargeID) {
+      $return->message = __FUNCTION__ . ' Missing charge_id';
+      return $return;
+    }
+
+    // Invoice ID is optional
+    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+
+    $contribution = $this->findContribution($chargeID, $invoiceID);
+    if (empty($contribution)) {
+      $return->message = __FUNCTION__ . ' Contribution not found';
+      return $return;
+    }
+
+    $failedContributionParams = [
+      'contribution_id' => $contribution['id'],
+      'order_reference' => $invoiceID ?? $chargeID,
+      'cancel_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+      'cancel_reason' => $this->getValueFromStripeObject('failure_message', 'String'),
+    ];
+    $this->updateContributionFailed($failedContributionParams);
+
+    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->ok = TRUE;
+    return $return;
+
   }
 
   /**
@@ -513,7 +570,7 @@ class Events {
   }
 
   /**
-   * Webhook event: invoice.paid
+   * Webhook event: invoice.paid / invoice.payment_succeeded
    * Invoice changed to paid. This is nearly identical to invoice.payment_succeeded
    *
    * The invoice.payment_successful type Event object is created and sent to any webhook endpoints configured
@@ -632,7 +689,7 @@ class Events {
   }
 
   /**
-   * invoice.finalized
+   * Webhook event: invoice.finalized
    *
    * @return \stdClass
    * @throws \CRM_Core_Exception
