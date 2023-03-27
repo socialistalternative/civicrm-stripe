@@ -717,13 +717,15 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       // Customer was found in civicrm database, fetch from Stripe.
       try {
         $stripeCustomer = $this->stripeClient->customers->retrieve($stripeCustomerID);
+        $shouldDeleteStripeCustomer = $stripeCustomer->isDeleted();
       } catch (Exception $e) {
         $err = self::parseStripeException('retrieve_customer', $e);
-        throw new PaymentProcessorException('Failed to retrieve Stripe Customer: ' . $err['code']);
+        \Civi::log()->error('Failed to retrieve Stripe Customer: ' . $err['code']);
+        $shouldDeleteStripeCustomer = TRUE;
       }
 
-      if ($stripeCustomer->isDeleted()) {
-        // Customer doesn't exist, create a new one
+      if ($shouldDeleteStripeCustomer) {
+        // Customer doesn't exist or was deleted, create a new one
         CRM_Stripe_Customer::delete($customerParams);
         try {
           $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
