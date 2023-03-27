@@ -83,11 +83,11 @@ class CRM_Stripe_Customer {
   /**
    * Add a new Stripe customer to the CiviCRM database
    *
-   * @param $params
+   * @param array $params
    *
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public static function add($params) {
+  public static function add(array $params) {
     return civicrm_api4('StripeCustomer', 'create', ['checkPermissions' => FALSE, 'values' => $params]);
   }
 
@@ -136,7 +136,7 @@ class CRM_Stripe_Customer {
    *
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public static function delete($params) {
+  public static function delete(array $params) {
     $requiredParams = ['processor_id'];
     foreach ($requiredParams as $required) {
       if (empty($params[$required])) {

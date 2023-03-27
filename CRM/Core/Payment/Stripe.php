@@ -740,12 +740,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
   }
 
   /**
-   * @param \Civi\Payment\PropertyBag $params
+   * @param \Civi\Payment\PropertyBag $propertyBag
    *
    * @return bool
    */
-  private function isPaymentForEventAdditionalParticipants($params) {
-    if ($params->getter('additional_participants', TRUE)) {
+  private function isPaymentForEventAdditionalParticipants(\Civi\Payment\PropertyBag $propertyBag): bool {
+    if ($propertyBag->getter('additional_participants', TRUE)) {
       return TRUE;
     }
     return FALSE;
