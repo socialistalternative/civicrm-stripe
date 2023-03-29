@@ -374,6 +374,88 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
   }
 
   /**
+   * Unlike charge succeeded, charge failed is processed.
+   */
+  public function testNewOneOffStripeCheckoutChargeFailed() {
+    $this->setOrCreateStripeCheckoutPaymentProcessor();
+    $this->getMocksForOneOffPayment();
+    $contribution = $this->setupPendingContribution(['invoice_id' => md5(uniqid(mt_rand(), TRUE))]);
+
+    // Simulate payment
+    $this->assertInstanceOf('CRM_Core_Payment_StripeCheckout', $this->paymentObject);
+
+    //
+    // Check the Contribution
+    // ...should be pending
+    // ...its transaction ID should be our Charge ID.
+    //
+    $this->checkContrib([
+      'contribution_status_id' => 'Pending',
+      'trxn_id'                => '',
+      'invoice_id'             => $contribution['invoice_id']
+    ]);
+
+    // Set the new contribution to have trxn_id=pi_mock
+    $success = $this->simulateEvent([
+      'type'             => 'checkout.session.completed',
+      'id'               => 'evt_mock',
+      'object'           => 'event', // ?
+      'livemode'         => FALSE,
+      'pending_webhooks' => 0,
+      'request'          => [ 'id' => NULL ],
+      'data'             => [
+        'object' => [
+          'id'           => 'cs_mock',
+          'object'       => 'checkout.session',
+          'customer'     => 'cus_mock',
+          'payment_intent' => 'pi_mock',
+          'client_reference_id' => $contribution['invoice_id'],
+        ]
+      ],
+    ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
+    $this->checkContrib([
+      'contribution_status_id' => 'Pending',
+      'trxn_id'                => 'pi_mock',
+    ]);
+
+    $success = $this->simulateEvent([
+      'type'             => 'charge.failed',
+      'id'               => 'evt_mock',
+      'object'           => 'event',
+      'livemode'         => FALSE,
+      'pending_webhooks' => 0,
+      'request'          => [ 'id' => NULL ],
+      'data'             => [
+        'object' => [
+          'id'                  => 'ch_mock',
+          'object'              => 'charge',
+          'amount'              => $this->total*100,
+          'amount_captured'     => $this->total*100,
+          'captured'            => TRUE,
+          'balance_transaction' => 'txn_mock',
+          'customer'            => 'cus_mock',
+          'payment_intent'      => 'pi_mock',
+          'created'             => time(),
+          'failure_message'     => 'Mocked failure',
+        ]
+      ],
+    ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
+    //
+    // Ensure Contribution is marked Failed, with the reason, and that the
+    // ContributionRecur is not changed from Pending.
+    //
+    $this->checkContrib([
+      'contribution_status_id' => 'Failed',
+      'trxn_id'                => 'ch_mock',
+      'cancel_reason'          => 'Mocked failure',
+    ]);
+  }
+
+  /**
    * Test creating a recurring contribution and
    * update it after creation. @todo The membership should also be updated.
    */
@@ -487,11 +569,11 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     ]);
     $this->checkContribRecur([ 'contribution_status_id' => 'Pending' ]);
   }
+
   /**
    * Unlike charge succeeded, charge failed is processed.
    */
   public function testNewRecurringChargeFailed() {
-
     $this->mockRecurringPaymentSetup();
 
     $success = $this->simulateEvent([
@@ -527,8 +609,9 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'trxn_id'                => 'in_mock',
       'cancel_reason'          => 'Mocked failure',
     ]);
-    $this->checkContribRecur([ 'contribution_status_id' => 'Pending' ]);
+    $this->checkContribRecur(['contribution_status_id' => 'Pending']);
   }
+
   /**
    *
    * @see https://stripe.com/docs/billing/invoices/overview#invoice-status-transition-endpoints-and-webhooks

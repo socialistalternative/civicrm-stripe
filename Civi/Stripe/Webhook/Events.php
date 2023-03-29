@@ -481,10 +481,11 @@ class Events {
       return $return;
     }
 
+    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
     // Invoice ID is optional
     $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
 
-    $contribution = $this->findContribution($chargeID, $invoiceID);
+    $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
     if (empty($contribution)) {
       $return->message = __FUNCTION__ . ' Contribution not found';
       return $return;
@@ -492,10 +493,11 @@ class Events {
 
     $failedContributionParams = [
       'contribution_id' => $contribution['id'],
-      'order_reference' => $invoiceID ?? $chargeID,
       'cancel_date' => $this->getValueFromStripeObject('receive_date', 'String'),
       'cancel_reason' => $this->getValueFromStripeObject('failure_message', 'String'),
     ];
+    // Fallback from invoiceID to chargeID. We can't use ?? because invoiceID might be empty string ie. '' and not NULL
+    $failedContributionParams['order_reference'] = empty($invoiceID) ? $chargeID : $invoiceID;
     $this->updateContributionFailed($failedContributionParams);
 
     $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
