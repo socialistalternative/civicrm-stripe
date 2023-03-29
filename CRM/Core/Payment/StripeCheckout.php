@@ -179,6 +179,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       'customer' => $stripeCustomerID,
       // 'submit_type' => one of 'auto', pay, book, donate
       'client_reference_id' => $propertyBag->getInvoiceID(),
+      'payment_method_types' => \Civi::settings()->get('stripe_checkout_supported_payment_methods'),
     ];
     $checkoutSession = $this->stripeClient->checkout->sessions->create($checkoutSessionParams);
 

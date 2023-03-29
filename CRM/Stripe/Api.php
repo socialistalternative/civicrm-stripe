@@ -9,6 +9,8 @@
  +--------------------------------------------------------------------+
  */
 
+use CRM_Stripe_ExtensionUtil as E;
+
 class CRM_Stripe_Api {
 
   /**
@@ -249,6 +251,39 @@ class CRM_Stripe_Api {
     //   of the CiviCRM locale. If it doesn't match the Stripe element will fallback
     //   to "auto"
     return substr($civiCRMLocale,0, 2);
+  }
+
+  public static function getListOfSupportedPaymentMethodsCheckout() {
+    return [
+      'card' => E::ts('Card'),
+      // 'acss_debit',
+      // 'affirm',
+      // 'afterpay_clearpay',
+      // 'alipay',
+      // 'au_becs_debit',
+      // 'bacs_debit',
+      // 'bancontact',
+      // 'blik',
+      // 'boleto',
+      // 'cashapp',
+      // 'customer_balance',
+      // 'eps',
+      // 'fpx',
+      // 'giropay',
+      // 'grabpay',
+      // 'ideal',
+      // 'klarna',
+      // 'konbini',
+      // 'oxxo',
+      // 'p24',
+      // 'paynow',
+      // 'pix',
+      // 'promptpay',
+      'sepa_debit' => E::ts('SEPA Direct Debit'),
+      // 'sofort',
+      //'us_bank_account',
+      // 'wechat_pay',
+    ];
   }
 
 }
