@@ -720,7 +720,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $shouldDeleteStripeCustomer = $stripeCustomer->isDeleted();
       } catch (Exception $e) {
         $err = self::parseStripeException('retrieve_customer', $e);
-        \Civi::log()->error('Failed to retrieve Stripe Customer: ' . $err['code']);
+        \Civi::log()->error($this->getLogPrefix() . 'Failed to retrieve Stripe Customer: ' . $err['code']);
         $shouldDeleteStripeCustomer = TRUE;
       }
 
@@ -784,8 +784,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       $required = 'recurFrequencyUnit';
     }
     if ($required) {
-      Civi::log()->error('Stripe doRecurPayment: Missing mandatory parameter: ' . $required);
-      throw new CRM_Core_Exception('Stripe doRecurPayment: Missing mandatory parameter: ' . $required);
+      Civi::log()->error($this->getLogPrefix() . 'doRecurPayment: Missing mandatory parameter: ' . $required);
+      throw new CRM_Core_Exception($this->getLogPrefix() . 'doRecurPayment: Missing mandatory parameter: ' . $required);
     }
 
     // Make sure recurFrequencyInterval is set (default to 1 if not)
@@ -842,7 +842,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     if ($stripeSubscription->status === 'incomplete') {
       // For example with test card 4000000000000341 (Attaching this card to a Customer object succeeds, but attempts to charge the customer fail)
-      \Civi::log()->warning('Stripe subscription status=incomplete. ID:' . $stripeSubscription->id);
+      \Civi::log()->warning($this->getLogPrefix() . 'subscription status=incomplete. ID:' . $stripeSubscription->id);
       throw new PaymentProcessorException('Payment failed');
     }
 
@@ -1003,7 +1003,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $requiredParams = ['trxn_id', 'amount'];
     foreach ($requiredParams as $required) {
       if (!isset($params[$required])) {
-        $message = 'Stripe doRefund: Missing mandatory parameter: ' . $required;
+        $message = $this->getLogPrefix() . 'doRefund: Missing mandatory parameter: ' . $required;
         Civi::log()->error($message);
         throw new PaymentProcessorException($message);
       }
@@ -1131,7 +1131,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $requiredParams = ['receive_date', 'installments', 'recurFrequencyInterval', 'recurFrequencyUnit'];
     foreach ($requiredParams as $required) {
       if (!isset($params[$required])) {
-        $message = 'Stripe calculateEndDate: Missing mandatory parameter: ' . $required;
+        $message = $this->getLogPrefix() . 'calculateEndDate: Missing mandatory parameter: ' . $required;
         Civi::log()->error($message);
         throw new CRM_Core_Exception($message);
       }
@@ -1172,7 +1172,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $requiredParams = ['recurFrequencyInterval', 'recurFrequencyUnit'];
     foreach ($requiredParams as $required) {
       if (!isset($params[$required])) {
-        $message = 'Stripe calculateNextScheduledDate: Missing mandatory parameter: ' . $required;
+        $message = $this->getLogPrefix() . 'calculateNextScheduledDate: Missing mandatory parameter: ' . $required;
         Civi::log()->error($message);
         throw new CRM_Core_Exception($message);
       }
@@ -1291,7 +1291,6 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $webhookSecret = $this->getWebhookSecret();
     if (!empty($webhookSecret)) {
       $sigHeader = $_SERVER['HTTP_STRIPE_SIGNATURE'];
-
       try {
         Webhook::constructEvent($rawData, $sigHeader, $webhookSecret);
         $ipnClass->setVerifyData(FALSE);
@@ -1299,12 +1298,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $ipnClass->setData($data);
       } catch (\UnexpectedValueException $e) {
         // Invalid payload
-        \Civi::log()->error('Stripe webhook signature validation error: ' . $e->getMessage());
+        \Civi::log()->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
         http_response_code(400);
         exit();
       } catch (\Stripe\Exception\SignatureVerificationException $e) {
         // Invalid signature
-        \Civi::log()->error('Stripe webhook signature validation error: ' . $e->getMessage());
+        \Civi::log()->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
         http_response_code(400);
         exit();
       }
@@ -1460,29 +1459,28 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * If the transaction is declined, there won't be a balance_transaction_id.
    * We also have to do currency conversion here in case Stripe has converted it internally.
    *
-   * @param string $balanceTransactionID
+   * @param \Stripe\BalanceTransaction $balanceTransaction
+   * @param
    *
    * @return float
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function getFeeFromBalanceTransaction(?string $balanceTransactionID, $currency): float {
-    $fee = 0.0;
-    if ($balanceTransactionID) {
-      try {
-        $balanceTransaction = $this->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
-        if ($currency !== $balanceTransaction->currency && !empty($balanceTransaction->exchange_rate)) {
-          $fee = CRM_Stripe_Api::currencyConversion($balanceTransaction->fee, $balanceTransaction->exchange_rate, $currency);
-        } else {
-          // We must round to currency precision otherwise payments may fail because Contribute BAO saves but then
-          // can't retrieve because it tries to use the full unrounded number when it only got saved with 2dp.
-          $fee = round($balanceTransaction->fee / 100, CRM_Utils_Money::getCurrencyPrecision($currency));
-        }
-      }
-      catch (Exception $e) {
-        throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
-      }
+  public function getFeeFromBalanceTransaction(\Stripe\BalanceTransaction $balanceTransaction, string $currency): float {
+    if ($currency !== $balanceTransaction->currency && !empty($balanceTransaction->exchange_rate)) {
+      $fee = CRM_Stripe_Api::currencyConversion($balanceTransaction->fee, $balanceTransaction->exchange_rate, $currency);
+    } else {
+      // We must round to currency precision otherwise payments may fail because Contribute BAO saves but then
+      // can't retrieve because it tries to use the full unrounded number when it only got saved with 2dp.
+      $fee = round($balanceTransaction->fee / 100, CRM_Utils_Money::getCurrencyPrecision($currency));
     }
     return $fee;
+  }
+
+  /**
+   * @return string
+   */
+  public function getLogPrefix(): string {
+    return 'Stripe(' . $this->getID() . '): ';
   }
 
 }
