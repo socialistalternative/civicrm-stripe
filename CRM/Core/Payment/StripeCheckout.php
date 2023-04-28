@@ -169,9 +169,22 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       $stripeCustomerID = $existingStripeCustomer['customer_id'];
     }
 
+    if (!empty($paymentParams['skipLineItem'])) {
+      $lineItems = [
+        'priceset' => [
+          'pricesetline' => [
+            'unit_price' => $paymentParams['amount'],
+            'field_title' => $paymentParams['source'],
+            'label' => $paymentParams['source'],
+            'qty' => 1,
+          ]]];
+    }
+    else {
+      $lineItems = $paymentParams['line_item'];
+    }
     // Build the checkout session parameters
     $checkoutSessionParams = [
-      'line_items' => $this->buildCheckoutLineItems($paymentParams['line_item'], $propertyBag),
+      'line_items' => $this->buildCheckoutLineItems($lineItems, $propertyBag),
       'mode' => $propertyBag->getIsRecur() ? 'subscription' : 'payment',
       'success_url' => $successUrl,
       'cancel_url' => $failUrl,
@@ -181,6 +194,10 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       'client_reference_id' => $propertyBag->getInvoiceID(),
       'payment_method_types' => \Civi::settings()->get('stripe_checkout_supported_payment_methods'),
     ];
+
+    // Allows you to alter the params passed to StripeCheckout (eg. payment_method_types)
+    CRM_Utils_Hook::alterPaymentProcessorParams($this, $propertyBag, $checkoutSessionParams);
+
     $checkoutSession = $this->stripeClient->checkout->sessions->create($checkoutSessionParams);
 
     CRM_Stripe_BAO_StripeCustomer::updateMetadata(['contact_id' => $propertyBag->getContactID()], $this, $checkoutSession['customer']);
