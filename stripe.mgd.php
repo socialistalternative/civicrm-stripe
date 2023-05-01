@@ -56,7 +56,7 @@ return [
       'signature_label' => 'Webhook Secret',
       'url_site_default' => 'http://unused.com',
       'url_site_test_default' => 'http://unused.com',
-      'billing_mode' => 1,
+      'billing_mode' => 4,
       'payment_type' => 1,
       'is_recur' => 1,
     ],
