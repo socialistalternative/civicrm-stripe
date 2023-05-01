@@ -169,7 +169,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       $stripeCustomerID = $existingStripeCustomer['customer_id'];
     }
 
-    if (!empty($paymentParams['skipLineItem'])) {
+    if (!empty($paymentParams['skipLineItem']) || empty($paymentParams['line_item'])) {
       $lineItems = [
         'priceset' => [
           'pricesetline' => [
