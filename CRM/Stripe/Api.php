@@ -296,7 +296,7 @@ class CRM_Stripe_Api {
       // 'promptpay',
       'sepa_debit' => E::ts('SEPA Direct Debit'),
       // 'sofort',
-      //'us_bank_account',
+      'us_bank_account' => E::ts('ACH Direct Debit'),
       // 'wechat_pay',
     ];
   }

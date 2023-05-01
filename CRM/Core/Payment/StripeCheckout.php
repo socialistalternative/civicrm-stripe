@@ -192,7 +192,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       'customer' => $stripeCustomerID,
       // 'submit_type' => one of 'auto', pay, book, donate
       'client_reference_id' => $propertyBag->getInvoiceID(),
-      'payment_method_types' => \Civi::settings()->get('stripe_checkout_supported_payment_methods'),
+      'payment_method_types' => $this->getSupportedPaymentMethods($propertyBag),
     ];
 
     // Allows you to alter the params passed to StripeCheckout (eg. payment_method_types)
@@ -207,6 +207,33 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
     CRM_Utils_System::setHttpHeader("HTTP/1.1 303 See Other", '');
     CRM_Utils_System::redirect($checkoutSession->url);
   }
+
+  /**
+   * @param \Civi\Payment\PropertyBag $propertyBag
+   *
+   * @return array
+   */
+  private function getSupportedPaymentMethods(\Civi\Payment\PropertyBag $propertyBag): array {
+    $paymentMethods = \Civi::settings()->get('stripe_checkout_supported_payment_methods');
+    $result = [];
+    foreach ($paymentMethods as $index => $paymentMethod) {
+      switch ($paymentMethod) {
+        case 'sepa_debit':
+          if ($propertyBag->getCurrency() === 'EUR') {
+            $result[] = $paymentMethod;
+          }
+          break;
+
+        default:
+          $result[] = $paymentMethod;
+      }
+    }
+    if (empty($result)) {
+      throw new PaymentProcessorException('There are no valid Stripe payment methods enabled for this configuration. Check currency etc.');
+    }
+    return $result;
+  }
+
 
   /**
    * Takes the lineitems passed into doPayment and converts them into an array suitable for passing to Stripe Checkout
