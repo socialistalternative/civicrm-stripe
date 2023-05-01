@@ -182,6 +182,46 @@ class Events {
   }
 
   /**
+   * @param string $chargeID
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  private function getDetailsFromBalanceTransaction(string $chargeID): array {
+    if (($this->getData()->object['object'] !== 'charge') && (!empty($chargeID))) {
+      $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
+      $balanceTransactionID = \CRM_Stripe_Api::getObjectParam('balance_transaction', $charge);
+    }
+    else {
+      $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String');
+    }
+    try {
+      $balanceTransaction = $this->getPaymentProcessor()->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
+    }
+    catch (\Exception $e) {
+      throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
+    }
+    if (!empty($balanceTransactionID)) {
+      $fee = $this->getPaymentProcessor()
+        ->getFeeFromBalanceTransaction($balanceTransaction, $this->getValueFromStripeObject('currency', 'String'));
+      return [
+        'fee_amount' => $fee,
+        'available_on' => $balanceTransaction->available_on,
+        'exchange_rate' => $balanceTransaction->exchange_rate,
+        'payout_amount' => $balanceTransaction->amount / 100,
+        'payout_currency' => $balanceTransaction->currency,
+      ];
+    }
+    else {
+      return [
+        'fee_amount' => 0.0
+      ];
+    }
+  }
+
+  /**
    * This allows us to end a subscription once:
    *   a) We've reached the end date / number of installments
    *   b) The recurring contribution is marked as completed
@@ -342,14 +382,19 @@ class Events {
 
     // If contribution is in Pending or Failed state record payment and transition to Completed
     if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
+      $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
       $contributionParams = [
         'contribution_id' => $contribution['id'],
         'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
         'order_reference' => $invoiceID ?? $chargeID,
         'trxn_id' => $chargeID,
         'total_amount' => $this->getValueFromStripeObject('amount', 'Float'),
-        'fee_amount' => $this->getFeeFromCharge($chargeID),
+        // 'fee_amount' Added below via $balanceTransactionDetails
       ];
+      foreach ($balanceTransactionDetails as $key => $value) {
+        $contributionParams[$key] = $value;
+      }
+
       $this->updateContributionCompleted($contributionParams);
     }
 

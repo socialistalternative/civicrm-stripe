@@ -42,7 +42,7 @@ return [
       ],
     ],
   ],
-  1 => [
+  [
     'name' => 'StripeCheckout',
     'entity' => 'PaymentProcessorType',
     'params' => [
@@ -64,5 +64,4 @@ return [
       'name',
     ],
   ],
-
 ];

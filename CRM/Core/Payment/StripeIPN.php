@@ -552,7 +552,13 @@ class CRM_Core_Payment_StripeIPN {
     else {
       $balanceTransactionID = CRM_Stripe_Api::getObjectParam('balance_transaction', $this->getData()->object);
     }
-    $this->fee = $this->getPaymentProcessor()->getFeeFromBalanceTransaction($balanceTransactionID, $this->retrieve('currency', 'String', FALSE));
+    try {
+      $balanceTransaction = $this->getPaymentProcessor()->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
+      $this->fee = $this->getPaymentProcessor()->getFeeFromBalanceTransaction($balanceTransaction, $this->retrieve('currency', 'String', FALSE));
+    }
+    catch (Exception $e) {
+      throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
+    }
 
     // Get the CiviCRM recurring contribution that matches the Stripe subscription (if we have one).
     $this->getSubscriptionDetails();
