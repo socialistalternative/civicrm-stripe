@@ -65,7 +65,7 @@ class CRM_Stripe_Api {
             return (bool) $stripeObject->captured;
 
           case 'currency':
-            return (string) mb_strtoupper($stripeObject->currency);
+            return self::formatCurrency($stripeObject->currency);
 
           case 'payment_intent_id':
             return (string) $stripeObject->payment_intent;
@@ -97,7 +97,7 @@ class CRM_Stripe_Api {
             return (string) $stripeObject->amount_remaining / 100;
 
           case 'currency':
-            return (string) mb_strtoupper($stripeObject->currency);
+            return self::formatCurrency($stripeObject->currency);
 
           case 'status_id':
             if ((bool) $stripeObject->paid) {
@@ -133,7 +133,7 @@ class CRM_Stripe_Api {
             return (string) $stripeObject->plan->amount / 100;
 
           case 'currency':
-            return (string) mb_strtoupper($stripeObject->plan->currency);
+            return self::formatCurrency($stripeObject->plan->currency);
 
           case 'plan_start':
             return self::formatDate($stripeObject->start_date);
@@ -204,6 +204,15 @@ class CRM_Stripe_Api {
    */
   public static function formatDate($stripeTimestamp) {
     return $stripeTimestamp ? date('YmdHis', $stripeTimestamp) : NULL;
+  }
+
+  /**
+   * @param string $stripeCurrency
+   *
+   * @return string
+   */
+  public static function formatCurrency(string $stripeCurrency): string {
+    return (string) mb_strtoupper($stripeCurrency);
   }
 
   /**

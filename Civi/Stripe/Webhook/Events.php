@@ -211,7 +211,7 @@ class Events {
         'available_on' => \CRM_Stripe_Api::formatDate($balanceTransaction->available_on),
         'exchange_rate' => $balanceTransaction->exchange_rate,
         'payout_amount' => $balanceTransaction->amount / 100,
-        'payout_currency' => $balanceTransaction->currency,
+        'payout_currency' => \CRM_Stripe_Api::formatCurrency($balanceTransaction->currency),
       ];
     }
     else {
