@@ -162,7 +162,7 @@ class Events {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \Stripe\Exception\ApiErrorException
    */
-  private function getFeeFromCharge(string $chargeID) {
+  private function getFeeFromCharge(string $chargeID): float {
     if (($this->getData()->object['object'] !== 'charge') && (!empty($chargeID))) {
       $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
       $balanceTransactionID = \CRM_Stripe_Api::getObjectParam('balance_transaction', $charge);
@@ -170,7 +170,15 @@ class Events {
     else {
       $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String');
     }
-    return $this->getPaymentProcessor()->getFeeFromBalanceTransaction($balanceTransactionID, $this->getValueFromStripeObject('currency', 'String'));
+    try {
+      $balanceTransaction = $this->getPaymentProcessor()->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
+    }
+    catch (\Exception $e) {
+      throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
+    }
+    $fee = $this->getPaymentProcessor()
+      ->getFeeFromBalanceTransaction($balanceTransaction, $this->getValueFromStripeObject('currency', 'String'));
+    return $fee ?? 0.0;
   }
 
   /**
