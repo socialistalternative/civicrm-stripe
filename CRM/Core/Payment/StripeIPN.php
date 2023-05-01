@@ -434,8 +434,17 @@ class CRM_Core_Payment_StripeIPN {
           $return = $webhookEventProcessor->doInvoicePaid();
           break;
 
+        case 'customer.subscription.updated':
+          $return = $webhookEventProcessor->doCustomerSubscriptionUpdated();
+          break;
+
+        case 'customer.subscription.deleted':
+          $return = $webhookEventProcessor->doCustomerSubscriptionDeleted();
+          break;
+
         default:
-          $return->ok = $this->processEventType();
+          $return->message = $this->eventType . ' - not implemented';
+          $return->ok = TRUE;
       }
 
     }
@@ -464,38 +473,6 @@ class CRM_Core_Payment_StripeIPN {
 
     $this->setEventID('');
     return $return;
-  }
-
-  /**
-   * Process the received event in CiviCRM
-   *
-   * @return bool
-   * @throws \CRM_Core_Exception
-   * @throws \CiviCRM_API3_Exception
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   * @throws \Stripe\Exception\ApiErrorException
-   */
-  private function processEventType() {
-    // NOTE: If you add an event here make sure you add it to the webhook or it will never be received!
-    switch($this->eventType) {
-      case 'customer.subscription.updated':
-        // Subscription is updated. This used to be "implemented" but didn't work
-        return TRUE;
-
-      case 'customer.subscription.deleted':
-        // Subscription is cancelled
-        if (!$this->getSubscriptionDetails()) {
-          // Subscription was not found in CiviCRM
-          CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'subscription_not_found');
-          return TRUE;
-        }
-        // Cancel the recurring contribution
-        $this->updateRecurCancelled(['id' => $this->contribution_recur_id, 'cancel_date' => $this->retrieve('cancel_date', 'String', FALSE)]);
-        return TRUE;
-    }
-
-    // Unhandled event
-    return TRUE;
   }
 
   /**

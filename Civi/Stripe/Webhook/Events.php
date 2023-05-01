@@ -456,7 +456,7 @@ class Events {
     if (isset($contribution['payments'])) {
       foreach ($contribution['payments'] as $payment) {
         if ($payment['trxn_id'] === $refund->id) {
-          $return->message = 'Refund ' . $refund->id . ' already recorded in CiviCRM';
+          $return->message = __FUNCTION__ . ' Refund ' . $refund->id . ' already recorded in CiviCRM';
           $return->ok = TRUE;
           return $return;
         }
@@ -665,7 +665,7 @@ class Events {
    * @throws \CiviCRM_API3_Exception
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function doInvoicePaid() {
+  public function doInvoicePaid(): \stdClass {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
@@ -737,7 +737,7 @@ class Events {
       ])['count'] > 0) {
       // Payment already recorded
       $return->ok = TRUE;
-      $return->message = E::ts('Payment already recorded');
+      $return->message = __FUNCTION__ . ': ' . E::ts('Payment already recorded');
       return $return;
     }
 
@@ -776,7 +776,7 @@ class Events {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \Stripe\Exception\ApiErrorException
    */
-  public function doInvoiceFinalized() {
+  public function doInvoiceFinalized(): \stdClass {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
@@ -836,7 +836,7 @@ class Events {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    * @throws \Stripe\Exception\ApiErrorException
    */
-  public function doInvoicePaymentFailed() {
+  public function doInvoicePaymentFailed(): \stdClass {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
@@ -885,6 +885,70 @@ class Events {
       $this->updateContributionFailed($params);
     }
     $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->ok = TRUE;
+    return $return;
+  }
+
+  /**
+   * Subscription is cancelled.
+   *
+   * @return \stdClass
+   * @throws \CiviCRM_API3_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   */
+  public function doCustomerSubscriptionDeleted(): \stdClass {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'subscription') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    if (!$subscriptionID) {
+      $return->message = __FUNCTION__ . ' Missing subscription_id';
+      return $return;
+    }
+
+    $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
+    if (empty($contributionRecur)) {
+      // Subscription was not found in CiviCRM
+      $result = [];
+      \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'subscription_not_found', $result);
+      if (empty($result['contributionRecur'])) {
+        $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+        $return->ok = TRUE;
+        return $return;
+      }
+      else {
+        $contributionRecur = $result['contributionRecur'];
+      }
+    }
+
+    // Cancel the recurring contribution
+    $this->updateRecurCancelled(['id' => $contributionRecur['id'], 'cancel_date' => $this->getValueFromStripeObject('cancel_date', 'String')]);
+
+    $return->message = __FUNCTION__ . ' contributionRecurID: ' . $contributionRecur['id'] . ' cancelled';
+    $return->ok = TRUE;
+    return $return;
+  }
+
+  /**
+   * Subscription is updated. We don't currently do anything with this
+   *
+   * @return \stdClass
+   */
+  public function doCustomerSubscriptionUpdated(): \stdClass {
+    $return = $this->getResultObject();
+
+    // Check we have the right data object for this event
+    if (($this->getData()->object['object'] ?? '') !== 'subscription') {
+      $return->message = __FUNCTION__ . ' Invalid object type';
+      return $return;
+    }
+
+    $return->message = __FUNCTION__ . ' ignoring - not implemented';
     $return->ok = TRUE;
     return $return;
   }
