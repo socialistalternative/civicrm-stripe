@@ -53,7 +53,13 @@ class CRM_Stripe_Api {
             return self::formatDate($stripeObject->created);
 
           case 'invoice_id':
-            return (string) $stripeObject->invoice;
+            // Handle both "expanded" and "collapsed" response
+            if (is_object($stripeObject->invoice)) {
+              return (string) $stripeObject->invoice->id;
+            }
+            else {
+              return (string) $stripeObject->invoice;
+            }
 
           case 'captured':
             return (bool) $stripeObject->captured;
