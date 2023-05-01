@@ -202,7 +202,7 @@ class CRM_Stripe_Api {
    *
    * @return string|null
    */
-  private static function formatDate($stripeTimestamp) {
+  public static function formatDate($stripeTimestamp) {
     return $stripeTimestamp ? date('YmdHis', $stripeTimestamp) : NULL;
   }
 

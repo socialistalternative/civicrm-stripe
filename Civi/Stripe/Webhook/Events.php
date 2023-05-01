@@ -208,7 +208,7 @@ class Events {
         ->getFeeFromBalanceTransaction($balanceTransaction, $this->getValueFromStripeObject('currency', 'String'));
       return [
         'fee_amount' => $fee,
-        'available_on' => $balanceTransaction->available_on,
+        'available_on' => \CRM_Stripe_Api::formatDate($balanceTransaction->available_on),
         'exchange_rate' => $balanceTransaction->exchange_rate,
         'payout_amount' => $balanceTransaction->amount / 100,
         'payout_currency' => $balanceTransaction->currency,

@@ -19,7 +19,7 @@ if (!empty($customGroup)) {
       'name' => 'CustomGroup_Payment_details_CustomField_available_on',
       'entity' => 'CustomField',
       'cleanup' => 'never',
-      'update' => 'always',
+      'update' => 'unmodified',
       'params' => [
         'version' => 4,
         'values' => [
@@ -58,15 +58,15 @@ if (!empty($customGroup)) {
       ],
     ],
     [
-      'name' => 'CustomGroup_Payment_details_CustomField_Exchange_Rate',
+      'name' => 'CustomGroup_Payment_details_CustomField_exchange_rate',
       'entity' => 'CustomField',
       'cleanup' => 'never',
-      'update' => 'always',
+      'update' => 'unmodified',
       'params' => [
         'version' => 4,
         'values' => [
           'custom_group_id.name' => 'Payment_details',
-          'name' => 'Exchange_Rate',
+          'name' => 'exchange_rate',
           'label' => E::ts('Exchange Rate'),
           'data_type' => 'Float',
           'html_type' => 'Text',
