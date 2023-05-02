@@ -144,8 +144,10 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'object'       => 'charge',
           'customer'     => 'cus_mock',
           'payment_intent' => 'pi_mock',
+          'balance_transaction' => 'txn_mock',
           'created'      => time(),
           'amount'       => $this->total*100,
+          'currency'     => 'usd',
           'status'       => 'succeeded',
           "captured"     => TRUE,
         ]
@@ -202,10 +204,12 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'object'       => 'charge',
           'customer'     => 'cus_mock',
           'payment_intent' => 'pi_mock',
+          'balance_transaction' => 'trx_mock',
           'created'      => time(),
           'amount'       => $this->total*100,
+          'currency'     => 'usd',
           'status'       => 'succeeded',
-          "captured"     => TRUE,
+          'captured'     => TRUE,
         ]
       ],
     ]);
@@ -276,10 +280,12 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'object'       => 'charge',
           'customer'     => 'cus_mock',
           'payment_intent' => 'pi_mock',
+          'balance_transaction' => 'txn_mock',
           'created'      => time(),
           'amount'       => $this->total*100,
+          'currency'     => 'usd',
           'status'       => 'succeeded',
-          "captured"     => TRUE,
+          'captured'     => TRUE,
         ]
       ],
     ]);
@@ -311,10 +317,12 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'object'       => 'charge',
           'customer'     => 'cus_mock',
           'charge'       => 'ch_mock',
+          'balance_transaction' => 'txn_mock',
           'created'      => time(),
           'amount'       => $this->total*100,
+          'currency'     => 'usd',
           'status'       => 'succeeded',
-          "captured"     => TRUE,
+          'captured'     => TRUE,
         ]
       ],
     ]);
@@ -477,6 +485,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'charge'       => 'ch_mock',
           'created'      => time(),
           'amount_due'   => $this->total*100,
+          'currency'     => 'usd',
           'status'      => 'paid',
         ]
       ],
@@ -513,7 +522,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'charge'       => 'ch_mock',
           'created'      => time(),
           'amount_due'   => $this->total*100,
-          'status'      => 'paid',
+          'currency'     => 'usd',
+          'status'       => 'paid',
         ]
       ],
     ]);
@@ -634,6 +644,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'charge'              => 'ch_mock',
           'amount_due'          => $this->total*100,
           'amount_paid'         => 0,
+          'currency'            => 'usd',
           'customer'            => 'cus_mock',
           'created'             => time(),
           'status'              => 'uncollectible'
@@ -711,7 +722,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'charge'       => 'ch_mock_2',
           'created'      => time(),
           'amount_due'   => $this->total*100,
-          'status'      => 'paid',
+          'currency'     => 'usd',
+          'status'       => 'paid',
         ]
       ],
     ], TRUE);
@@ -757,7 +769,8 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'charge'       => 'ch_mock_2',
           'created'      => time(),
           'amount_due'   => $this->total*100,
-          'status'      => 'paid',
+          'currency'     => 'usd',
+          'status'       => 'paid',
         ]
       ],
     ], TRUE);
@@ -827,6 +840,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'id'           => 'in_mock_2',
       'object'       => 'invoice',
       'amount_due'   => $this->total*100,
+      'currency'     => 'usd',
       'charge'       => 'ch_mock_2',
       'subscription' => 'sub_mock',
       'customer'     => 'cus_mock',
@@ -912,6 +926,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'subscription'        => 'sub_mock',
           'amount_due'          => $this->total*100,
           'amount_paid'         => 0,
+          'currency'            => 'usd',
           'customer'            => 'cus_mock',
           'created'             => $createdTimestamp,
           'status'              => 'uncollectible'
@@ -980,6 +995,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
           'subscription' => 'sub_mock',
           'amount_due'  => $this->total*100,
           'amount_paid' => 0,
+          'currency'    => 'usd',
           'customer'    => 'cus_mock',
           'created'     => time(),
           'status'      => 'paid',
@@ -1183,6 +1199,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'id'           => 'in_mock_2',
         'object'       => 'invoice',
         'amount_due'   => $this->total*100,
+        'currency'     => 'usd',
         'charge'       => 'ch_mock_2',
       ]);
     $balanceTransaction2 = new PropertySpy('balance_transaction2', [
@@ -1443,6 +1460,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       ->will($this->returnValueMap([
         ['id', 'ch_mock'],
         ['captured', TRUE],
+        ['currency', 'usd'],
         ['status', 'succeeded'],
         ['balance_transaction', 'txn_mock'],
       ]));
@@ -1454,6 +1472,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'id' => 'ch_mock',
       'object' => 'charge',
       'captured' => TRUE,
+      'currency' => 'usd',
       'status' => 'succeeded',
       'balance_transaction' => 'txn_mock',
       'invoice' => 'in_mock'
@@ -1537,6 +1556,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       ->expects($this->never())
       ->method($this->anything());
   }
+
   /**
    * DRY code. Sets up the database as it would be after a recurring contrib
    * has been set up with Stripe.

@@ -1459,13 +1459,13 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * If the transaction is declined, there won't be a balance_transaction_id.
    * We also have to do currency conversion here in case Stripe has converted it internally.
    *
-   * @param \Stripe\BalanceTransaction $balanceTransaction
+   * @param \Stripe\BalanceTransaction|PropertySpy $balanceTransaction
    * @param
    *
    * @return float
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
-  public function getFeeFromBalanceTransaction(\Stripe\BalanceTransaction $balanceTransaction, string $currency): float {
+  public function getFeeFromBalanceTransaction($balanceTransaction, string $currency): float {
     if ($currency !== $balanceTransaction->currency && !empty($balanceTransaction->exchange_rate)) {
       $fee = CRM_Stripe_Api::currencyConversion($balanceTransaction->fee, $balanceTransaction->exchange_rate, $currency);
     } else {
