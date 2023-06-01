@@ -90,7 +90,7 @@ class CRM_Stripe_BAO_StripeCustomer extends CRM_Stripe_DAO_StripeCustomer {
       $stripeCustomer = $stripe->stripeClient->customers->update($stripeCustomerID, $stripeCustomerParams);
     }
     catch (Exception $e) {
-      $err = CRM_Core_Payment_Stripe::parseStripeException('create_customer', $e);
+      $err = $stripe->parseStripeException('create_customer', $e);
       \Civi::log('stripe')->error('Failed to create Stripe Customer: ' . $err['message'] . '; ' . print_r($err, TRUE));
       throw new \Civi\Payment\Exception\PaymentProcessorException('Failed to update Stripe Customer: ' . $err['code']);
     }

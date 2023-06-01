@@ -282,13 +282,13 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return array $err
    */
-  public static function parseStripeException(string $op, \Exception $e): array {
+  public function parseStripeException(string $op, \Exception $e): array {
     $genericError = ['code' => 9000, 'message' => E::ts('An error occurred')];
 
     switch (get_class($e)) {
       case 'Stripe\Exception\CardException':
         // Since it's a decline, \Stripe\Exception\CardException will be caught
-        \Civi::log('stripe')->error($op . ': ' . get_class($e) . ': ' . $e->getMessage() . print_r($e->getJsonBody(),TRUE));
+        \Civi::log('stripe')->error($this->getLogPrefix() . $op . ': ' . get_class($e) . ': ' . $e->getMessage() . print_r($e->getJsonBody(),TRUE));
         $error['code'] = $e->getError()->code;
         $error['message'] = $e->getError()->message;
         return $error;
@@ -297,20 +297,27 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         // Too many requests made to the API too quickly
       case 'Stripe\Exception\InvalidRequestException':
         // Invalid parameters were supplied to Stripe's API
-        $genericError['code'] = $e->getError()->code;
+        switch ($e->getError()->code) {
+          case 'payment_intent_unexpected_state':
+            $genericError['message'] = E::ts('An error occurred while processing the payment');
+            break;
+        }
+        // Don't show the actual error code to the end user - we log it so sysadmin can fix it if required.
+        $genericError['code'] = '';
+
       case 'Stripe\Exception\AuthenticationException':
         // Authentication with Stripe's API failed
         // (maybe you changed API keys recently)
       case 'Stripe\Exception\ApiConnectionException':
         // Network communication with Stripe failed
-        \Civi::log('stripe')->error($op . ': ' . get_class($e) . ': ' . $e->getMessage());
+        \Civi::log('stripe')->error($this->getLogPrefix() . $op . ': ' . get_class($e) . ': ' . $e->getMessage());
         return $genericError;
 
       case 'Stripe\Exception\ApiErrorException':
         // Display a very generic error to the user, and maybe send yourself an email
         // Get the error array. Creat a "fake" error code if error is not set.
         // The calling code will parse this further.
-        \Civi::log('stripe')->error($op . ': ' . get_class($e) . ': ' . $e->getMessage() . print_r($e->getJsonBody(),TRUE));
+        \Civi::log('stripe')->error($this->getLogPrefix() . $op . ': ' . get_class($e) . ': ' . $e->getMessage() . print_r($e->getJsonBody(),TRUE));
         return $e->getJsonBody()['error'] ?? $genericError;
 
       default:
@@ -327,7 +334,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return \Stripe\Plan
    */
-  public function createPlan($params, $amount) {
+  public function createPlan(array $params, int $amount): \Stripe\Plan {
     $currency = $this->getCurrency($params);
     $planId = "every-{$params['recurFrequencyInterval']}-{$params['recurFrequencyUnit']}-{$amount}-" . strtolower($currency);
 
@@ -341,7 +348,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       $plan = $this->stripeClient->plans->retrieve($planId);
     }
     catch (\Stripe\Exception\InvalidRequestException $e) {
-      $err = self::parseStripeException('plan_retrieve', $e);
+      $err = $this->parseStripeException('plan_retrieve', $e);
       if ($err['code'] === 'resource_missing') {
         $formatted_amount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $currency);
         $productName = "CiviCRM " . (isset($params['membership_name']) ? $params['membership_name'] . ' ' : '') . "every {$params['recurFrequencyInterval']} {$params['recurFrequencyUnit']}(s) {$currency}{$formatted_amount}";
@@ -372,7 +379,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return array
    */
-  public function getPaymentFormFields() {
+  public function getPaymentFormFields(): array {
     return [];
   }
 
@@ -384,7 +391,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @return array
    *   field metadata
    */
-  public function getPaymentFormFieldsMetadata() {
+  public function getPaymentFormFieldsMetadata(): array {
     return [];
   }
 
@@ -398,7 +405,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return array
    */
-  public function getBillingAddressFields($billingLocationID = NULL) {
+  public function getBillingAddressFields($billingLocationID = NULL): array {
     if ((boolean) \Civi::settings()->get('stripe_nobillingaddress')) {
       return [];
     }
@@ -415,7 +422,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @return array
    *    Array of metadata for address fields.
    */
-  public function getBillingAddressFieldsMetadata($billingLocationID = NULL) {
+  public function getBillingAddressFieldsMetadata($billingLocationID = NULL): array {
     if ((boolean) \Civi::settings()->get('stripe_nobillingaddress')) {
       return [];
     }
@@ -652,7 +659,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         'currency' => $propertyBag->getCurrency(),
       ];
       $processIntentResult = $stripePaymentIntent->processPaymentIntent($paymentIntentParams);
-      if ($processIntentResult->ok && !empty($processIntentResult->data['success'])) {
+      if ($processIntentResult->ok) {
         $paymentIntentID = $processIntentResult->data['paymentIntent']['id'];
       }
       else {
@@ -672,7 +679,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       $intent = $this->stripeClient->paymentIntents->update($intent->id, $intentParams);
     }
     catch (Exception $e) {
-      $this->handleError($e->getCode(), $e->getMessage(), $params['error_url']);
+      $parsedError = $this->parseStripeException('doPayment', $e);
+      $this->handleError($parsedError['code'], $parsedError['message'], $params['error_url'], FALSE);
     }
 
     $params = $this->processPaymentIntent($params, $intent);
@@ -719,7 +727,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $stripeCustomer = $this->stripeClient->customers->retrieve($stripeCustomerID);
         $shouldDeleteStripeCustomer = $stripeCustomer->isDeleted();
       } catch (Exception $e) {
-        $err = self::parseStripeException('retrieve_customer', $e);
+        $err = $this->parseStripeException('retrieve_customer', $e);
         \Civi::log()->error($this->getLogPrefix() . 'Failed to retrieve Stripe Customer: ' . $err['code']);
         $shouldDeleteStripeCustomer = TRUE;
       }
@@ -731,7 +739,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
           $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
         } catch (Exception $e) {
           // We still failed to create a customer
-          $err = self::parseStripeException('create_customer', $e);
+          $err = $this->parseStripeException('create_customer', $e);
           throw new PaymentProcessorException('Failed to create Stripe Customer: ' . $err['code']);
         }
       }
@@ -938,7 +946,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
             $stripeBalanceTransaction = $this->stripeClient->balanceTransactions->retrieve($stripeCharge->balance_transaction);
           }
           catch (Exception $e) {
-            $err = self::parseStripeException('retrieve_balance_transaction', $e);
+            $err = $this->parseStripeException('retrieve_balance_transaction', $e);
             throw new PaymentProcessorException('Failed to retrieve Stripe Balance Transaction: ' . $err['code']);
           }
           if (($stripeCharge['currency'] !== $stripeBalanceTransaction->currency)

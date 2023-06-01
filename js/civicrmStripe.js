@@ -399,6 +399,15 @@
 
       script.debugging('New ID: ' + CRM.vars[script.name].id + ' pubKey: ' + CRM.vars[script.name].publishableKey);
 
+      if (CRM.vars[script.name].publishableKey === '') {
+        script.debugging('Invalid payment configuration!');
+        CRM.payment.swalFire({
+          icon: 'error',
+          text: '',
+          title: ts('Invalid payment configuration!')
+        }, '', true);
+      }
+
       stripe = Stripe(CRM.vars[script.name].publishableKey);
 
       script.debugging('locale: ' + CRM.vars[script.name].locale);

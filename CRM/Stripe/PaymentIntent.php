@@ -472,7 +472,7 @@ class CRM_Stripe_PaymentIntent {
         $intent = $this->paymentProcessor->stripeClient->paymentIntents->create($intentParams);
       }
       catch (Exception $e) {
-        $parsedError = $this->paymentProcessor::parseStripeException('process_paymentintent', $e);
+        $parsedError = $this->paymentProcessor->parseStripeException('process_paymentintent', $e);
         // Save the "error" in the paymentIntent table in case investigation is required.
         $stripePaymentintentParams = [
           'payment_processor_id' => $this->paymentProcessor->getID(),
@@ -572,6 +572,7 @@ class CRM_Stripe_PaymentIntent {
       $resultObject->ok = TRUE;
       $resultObject->data['requires_action'] = true;
       $resultObject->data['paymentIntentClientSecret'] = $intent->client_secret;
+      $resultObject->data['paymentIntent'] = ['id' => $intent->id];
     }
     elseif (($intent->status === 'requires_capture') || ($intent->status === 'requires_confirmation')) {
       // paymentIntent = requires_capture / requires_confirmation

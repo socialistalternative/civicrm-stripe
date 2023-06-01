@@ -113,7 +113,7 @@ class CRM_Stripe_Customer {
       $stripeCustomer = $stripe->stripeClient->customers->create($stripeCustomerParams);
     }
     catch (Exception $e) {
-      $err = CRM_Core_Payment_Stripe::parseStripeException('create_customer', $e);
+      $err = $stripe->parseStripeException('create_customer', $e);
       \Civi::log('stripe')->error('Failed to create Stripe Customer: ' . $err['message'] . '; ' . print_r($err, TRUE));
       throw new PaymentProcessorException('Failed to create Stripe Customer: ' . $err['code']);
     }
