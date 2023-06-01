@@ -45,6 +45,8 @@ return [
   [
     'name' => 'StripeCheckout',
     'entity' => 'PaymentProcessorType',
+    'cleanup' => 'unused',
+    'update' => 'unmodified',
     'params' => [
       'version' => 3,
       'name' => 'StripeCheckout',
