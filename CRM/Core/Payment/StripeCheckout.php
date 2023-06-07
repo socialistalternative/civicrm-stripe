@@ -169,15 +169,27 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       $stripeCustomerID = $existingStripeCustomer['customer_id'];
     }
 
+    $lineItems = [];
     if (!empty($paymentParams['skipLineItem']) || empty($paymentParams['line_item'])) {
-      $lineItems = [
-        'priceset' => [
-          'pricesetline' => [
-            'unit_price' => $paymentParams['amount'],
-            'field_title' => $paymentParams['source'],
-            'label' => $paymentParams['source'],
-            'qty' => 1,
-          ]]];
+      if (!empty($paymentParams['participants_info'])) {
+        // Events: Multiple participants. Lineitem for each participant is in participantDetail.
+        foreach ($paymentParams['participants_info'] as $participantID => $participantDetail) {
+          $lineItems = array_merge($lineItems, $participantDetail['lineItem']);
+        }
+      }
+      else {
+        // Fallback if no lineitems (some contribution pages)
+        $lineItems = [
+          'priceset' => [
+            'pricesetline' => [
+              'unit_price' => $paymentParams['amount'],
+              'field_title' => $paymentParams['source'],
+              'label' => $paymentParams['source'],
+              'qty' => 1,
+            ]
+          ]
+        ];
+      }
     }
     else {
       $lineItems = $paymentParams['line_item'];
