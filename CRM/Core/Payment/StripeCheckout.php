@@ -183,8 +183,9 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
           'priceset' => [
             'pricesetline' => [
               'unit_price' => $paymentParams['amount'],
-              'field_title' => $paymentParams['source'],
-              'label' => $paymentParams['source'],
+              // source is available on contribution pages, description on event registration
+              'field_title' => $paymentParams['source'] ?? $paymentParams['description'],
+              'label' => $paymentParams['source'] ?? $paymentParams['description'],
               'qty' => 1,
             ]
           ]
