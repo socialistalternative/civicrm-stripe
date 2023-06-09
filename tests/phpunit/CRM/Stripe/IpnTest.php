@@ -159,6 +159,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'pi_mock,ch_mock',
+      'fee_amount'             => 11.90
     ]);
   }
 
@@ -295,6 +296,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'pi_mock,ch_mock',
+      'fee_amount'             => 11.90
     ]);
   }
 
@@ -332,6 +334,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'ch_mock',
+      'fee_amount'             => 11.90
     ]);
   }
 
@@ -496,6 +499,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'ch_mock',
+      'fee_amount'             => 11.90
     ]);
     $this->checkContribRecur(['contribution_status_id' => 'In Progress']);
   }
@@ -533,6 +537,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'ch_mock',
+      'fee_amount'             => 11.90
     ]);
     $this->checkContribRecur(['contribution_status_id' => 'In Progress']);
   }
@@ -731,6 +736,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'in_mock_2,ch_mock_2',
+      'fee_amount'             => 11.90
     ], (int) $contrib2['id']);
 
   }
@@ -783,6 +789,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'in_mock_2,ch_mock_2',
+      'fee_amount'             => 11.90
     ], $contrib2);
 
     // Now trigger invoice.finalized. We expect that it does nothing?
@@ -810,6 +817,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'in_mock_2,ch_mock_2',
+      'fee_amount'             => 11.90
     ], $contrib2);
 
   }
@@ -1009,6 +1017,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id' => 'in_mock_2,ch_mock_3',
+      'fee_amount' => 11.90
     ], $contributions[1]);
   }
 
@@ -1067,6 +1076,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     $this->checkContrib([
       'contribution_status_id' => 'Completed',
       'trxn_id'                => 'ch_mock',
+      'fee_amount'             => 11.90
     ]);
   }
 

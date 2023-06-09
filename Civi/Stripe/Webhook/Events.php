@@ -157,33 +157,6 @@ class Events {
   /**
    * @param string $chargeID
    *
-   * @return float
-   * @throws \CRM_Core_Exception
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   * @throws \Stripe\Exception\ApiErrorException
-   */
-  private function getFeeFromCharge(string $chargeID): float {
-    if (($this->getData()->object['object'] !== 'charge') && (!empty($chargeID))) {
-      $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
-      $balanceTransactionID = \CRM_Stripe_Api::getObjectParam('balance_transaction', $charge);
-    }
-    else {
-      $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String');
-    }
-    try {
-      $balanceTransaction = $this->getPaymentProcessor()->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
-    }
-    catch (\Exception $e) {
-      throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
-    }
-    $fee = $this->getPaymentProcessor()
-      ->getFeeFromBalanceTransaction($balanceTransaction, $this->getValueFromStripeObject('currency', 'String'));
-    return $fee ?? 0.0;
-  }
-
-  /**
-   * @param string $chargeID
-   *
    * @return array
    * @throws \CRM_Core_Exception
    * @throws \Civi\Payment\Exception\PaymentProcessorException
@@ -305,6 +278,7 @@ class Events {
     // We have a recurring contribution but no contribution so we'll repeattransaction
     // Stripe has generated a new invoice (next payment in a subscription) so we
     //   create a new contribution in CiviCRM
+    $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
     $repeatContributionParams = [
       'contribution_recur_id' => $contributionRecur['id'],
       'contribution_status_id' => \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending'),
@@ -312,8 +286,11 @@ class Events {
       'order_reference' => $invoiceID,
       'trxn_id' => $chargeID,
       'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
-      'fee_amount' => $this->getFeeFromCharge($chargeID),
+      // 'fee_amount' Added below via $balanceTransactionDetails
     ];
+    foreach ($balanceTransactionDetails as $key => $value) {
+      $repeatContributionParams[$key] = $value;
+    }
     return $this->repeatContribution($repeatContributionParams);
     // Don't touch the contributionRecur as it's updated automatically by Contribution.repeattransaction
   }
@@ -747,15 +724,20 @@ class Events {
 
     // If contribution is in Pending or Failed state record payment and transition to Completed
     if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
+      $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
       $contributionParams = [
         'contribution_id' => $contribution['id'],
         'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
         'order_reference' => $invoiceID,
         'trxn_id' => $chargeID,
         'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
-        'fee_amount' => $this->getFeeFromCharge($chargeID),
+        // 'fee_amount' Added below via $balanceTransactionDetails
         'contribution_status_id' => $contribution['contribution_status_id'],
       ];
+      foreach ($balanceTransactionDetails as $key => $value) {
+        $contributionParams[$key] = $value;
+      }
+
       $this->updateContributionCompleted($contributionParams);
       // Don't touch the contributionRecur as it's updated automatically by Contribution.completetransaction
     }

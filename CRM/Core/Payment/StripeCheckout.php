@@ -252,7 +252,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
    * Takes the lineitems passed into doPayment and converts them into an array suitable for passing to Stripe Checkout
    *
    * @param array $civicrmLineItems
-   * @param string $currency
+   * @param \Civi\Payment\PropertyBag $propertyBag
    *
    * @return array
    * @throws \Brick\Money\Exception\UnknownCurrencyException
