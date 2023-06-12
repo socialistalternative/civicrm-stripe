@@ -13,7 +13,10 @@ $customGroup = \Civi\Api4\CustomGroup::get(FALSE)
   ->addWhere('name', '=', 'Payment_details')
   ->execute()
   ->first();
-if (!empty($customGroup)) {
+if (empty($customGroup)) {
+  return [];
+}
+else {
   return [
     [
       'name' => 'CustomGroup_Payment_details_CustomField_available_on',

@@ -53,8 +53,11 @@ class CRM_Stripe_Api {
             return self::formatDate($stripeObject->created);
 
           case 'invoice_id':
+            if (!isset($stripeObject->invoice)) {
+              return '';
+            }
             // Handle both "expanded" and "collapsed" response
-            if (is_object($stripeObject->invoice)) {
+            elseif (is_object($stripeObject->invoice)) {
               return (string) $stripeObject->invoice->id;
             }
             else {
