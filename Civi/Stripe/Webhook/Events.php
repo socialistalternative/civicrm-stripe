@@ -363,7 +363,7 @@ class Events {
       $contributionParams = [
         'contribution_id' => $contribution['id'],
         'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
-        'order_reference' => $invoiceID ?? $chargeID,
+        'order_reference' => !empty($invoiceID) ? $invoiceID : $chargeID,
         'trxn_id' => $chargeID,
         'total_amount' => $this->getValueFromStripeObject('amount', 'Float'),
         // 'fee_amount' Added below via $balanceTransactionDetails
