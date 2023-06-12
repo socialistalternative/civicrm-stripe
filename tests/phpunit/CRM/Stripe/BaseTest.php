@@ -344,6 +344,32 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
   }
 
   /**
+   * Sugar for checking things on the FinancialTrxn.
+   *
+   * @param array $expectations key => value pairs.
+   * @param int $contributionID
+   *   - if null, use this->contributionID
+   *   - if array, assume it's the result of a contribution.getsingle
+   *   - if int, load that contrib.
+   */
+  protected function checkFinancialTrxn(array $expectations, int $contributionID) {
+    $this->assertGreaterThan(0, $contributionID);
+    $latestFinancialTrxn = \Civi\Api4\FinancialTrxn::get(FALSE)
+      ->addSelect('*', 'custom.*')
+      ->addJoin('Contribution AS contribution', 'LEFT', 'EntityFinancialTrxn')
+      ->addWhere('contribution.id', '=', $contributionID)
+      ->addWhere('is_payment', '=', TRUE)
+      ->addOrderBy('id', 'DESC')
+      ->execute()
+      ->first();
+
+    foreach ($expectations as $field => $expect) {
+      $this->assertArrayHasKey($field, $latestFinancialTrxn);
+      $this->assertEquals($expect, $latestFinancialTrxn[$field], "Expected FinancialTrxn.$field = " . json_encode($expect));
+    }
+  }
+
+  /**
    * Sugar for checking things on the contribution recur.
    */
   protected function checkContribRecur(array $expectations) {

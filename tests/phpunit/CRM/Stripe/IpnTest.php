@@ -73,7 +73,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     ]);
     $this->assertEquals(TRUE, $success, 'IPN did not return OK');
 
-    // Ensure Contribution status is updated to complete and that we now have both invoice ID and charge ID as the transaction ID.
+    // charge is not yet captured so contribution should remain pending
     $this->checkContrib([
       'contribution_status_id' => 'Pending',
       'trxn_id'                => 'ch_mock',
@@ -336,6 +336,17 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'trxn_id'                => 'ch_mock',
       'fee_amount'             => 11.90
     ]);
+
+    // Check we set some values on the FinancialTrxn (payment)
+    $this->checkFinancialTrxn([
+      'Payment_details.available_on' => '2023-06-10 21:05:05',
+      'fee_amount' => 11.90,
+      'total_amount' => $this->total,
+      'order_reference' => 'ch_mock',
+      'trxn_id' => 'ch_mock'
+    ],
+      $this->contributionID
+    );
   }
 
   /**
@@ -734,11 +745,23 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     ], TRUE);
     // Check the contribution was updated.
     $this->checkContrib([
-      'contribution_status_id' => 'Completed',
-      'trxn_id'                => 'in_mock_2,ch_mock_2',
-      'fee_amount'             => 11.90
-    ], (int) $contrib2['id']);
+        'contribution_status_id' => 'Completed',
+        'trxn_id'                => 'in_mock_2,ch_mock_2',
+        'fee_amount'             => 11.90
+      ],
+      (int) $contrib2['id']
+    );
 
+    // Check we set some values on the FinancialTrxn (payment)
+    $this->checkFinancialTrxn([
+        'Payment_details.available_on' => '2023-06-10 21:05:05',
+        'fee_amount' => 11.90,
+        'total_amount' => $this->total,
+        'order_reference' => 'in_mock_2',
+        'trxn_id' => 'ch_mock_2'
+      ],
+      (int) $contrib2['id']
+    );
   }
   /**
    * It's possible that the payment_succeeded event comes in before finalized.
@@ -1222,6 +1245,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       'fee'           => 1190, /* means $11.90 */
       'status'        => 'available',
       'type'          => 'charge',
+      'available_on'  => '1686427505' // 2023-06-10 21:05:05
     ]);
 
     $this->paymentObject->stripeClient->balanceTransactions = $this->createMock('Stripe\\Service\\BalanceTransactionService');
@@ -1343,6 +1367,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
         'currency' => 'usd',
         'exchange_rate' => NULL,
         'object' => 'balance_transaction',
+        'available_on'  => '1686427505' // 2023-06-10 21:05:05
       ]));
 
     $mockRefund = new PropertySpy('Refund', [
