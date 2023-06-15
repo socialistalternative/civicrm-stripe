@@ -397,11 +397,10 @@ class CRM_Core_Payment_StripeIPN {
     try {
       $this->setInputParameters();
 
-      $webhookEventProcessor = new \Civi\Stripe\Webhook\Events();
+      $webhookEventProcessor = new \Civi\Stripe\Webhook\Events($this->getPaymentProcessor()->getID());
       $webhookEventProcessor->setEventType($this->getEventType());
       $webhookEventProcessor->setEventID($this->getEventID());
       $webhookEventProcessor->setData($this->getData());
-      $webhookEventProcessor->setPaymentProcessor($this->getPaymentProcessor()->getID());
 
       switch ($this->eventType) {
         case 'checkout.session.completed':

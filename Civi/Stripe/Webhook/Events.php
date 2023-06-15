@@ -20,9 +20,20 @@ class Events {
   use \CRM_Core_Payment_MJWIPNTrait;
 
   /**
+   * @var \Civi\Stripe\Api
+   */
+  private $api;
+
+  /**
    * @var \CRM_Core_Payment_Stripe Payment processor
    */
   private $paymentProcessor;
+
+  public function __construct(int $paymentProcessorID) {
+    $this->setPaymentProcessor($paymentProcessorID);
+    $this->api = new \Civi\Stripe\Api();
+    $this->api->setPaymentProcessor($paymentProcessorID);
+  }
 
   /**
    * @param string $eventID
@@ -60,21 +71,6 @@ class Events {
     $return->ok = FALSE;
     $return->exception = NULL;
     return $return;
-  }
-
-  /**
-   * @param string $name The key of the required value
-   * @param string $dataType The datatype of the required value (eg. String)
-   *
-   * @return int|mixed|null
-   * @throws \CRM_Core_Exception
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   * @throws \Stripe\Exception\ApiErrorException
-   */
-  private function getValueFromStripeObject(string $name, string $dataType) {
-    $value = \CRM_Stripe_Api::getObjectParam($name, $this->getData()->object);
-    $value = \CRM_Utils_Type::validate($value, $dataType, FALSE);
-    return $value;
   }
 
   /**
@@ -152,46 +148,6 @@ class Events {
       $contribution = $contributionApi3['values'][$contributionApi3['id']];
     }
     return $contribution ?? [];
-  }
-
-  /**
-   * @param string $chargeID
-   *
-   * @return array
-   * @throws \CRM_Core_Exception
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   * @throws \Stripe\Exception\ApiErrorException
-   */
-  private function getDetailsFromBalanceTransaction(string $chargeID): array {
-    if (($this->getData()->object['object'] !== 'charge') && (!empty($chargeID))) {
-      $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
-      $balanceTransactionID = \CRM_Stripe_Api::getObjectParam('balance_transaction', $charge);
-    }
-    else {
-      $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String');
-    }
-    try {
-      $balanceTransaction = $this->getPaymentProcessor()->stripeClient->balanceTransactions->retrieve($balanceTransactionID);
-    }
-    catch (\Exception $e) {
-      throw new \Civi\Payment\Exception\PaymentProcessorException("Error retrieving balanceTransaction {$balanceTransactionID}. " . $e->getMessage());
-    }
-    if (!empty($balanceTransactionID)) {
-      $fee = $this->getPaymentProcessor()
-        ->getFeeFromBalanceTransaction($balanceTransaction, $this->getValueFromStripeObject('currency', 'String'));
-      return [
-        'fee_amount' => $fee,
-        'available_on' => \CRM_Stripe_Api::formatDate($balanceTransaction->available_on),
-        'exchange_rate' => $balanceTransaction->exchange_rate,
-        'payout_amount' => $balanceTransaction->amount / 100,
-        'payout_currency' => \CRM_Stripe_Api::formatCurrency($balanceTransaction->currency),
-      ];
-    }
-    else {
-      return [
-        'fee_amount' => 0.0
-      ];
-    }
   }
 
   /**
@@ -278,14 +234,14 @@ class Events {
     // We have a recurring contribution but no contribution so we'll repeattransaction
     // Stripe has generated a new invoice (next payment in a subscription) so we
     //   create a new contribution in CiviCRM
-    $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
+    $balanceTransactionDetails = $this->api->getDetailsFromBalanceTransaction($chargeID, $this->getData()->object);
     $repeatContributionParams = [
       'contribution_recur_id' => $contributionRecur['id'],
       'contribution_status_id' => \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending'),
-      'receive_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+      'receive_date' => $this->api->getValueFromStripeObject('receive_date', 'String', $this->getData()->object),
       'order_reference' => $invoiceID,
       'trxn_id' => $chargeID,
-      'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
+      'total_amount' => $this->api->getValueFromStripeObject('amount', 'String', $this->getData()->object),
       // 'fee_amount' Added below via $balanceTransactionDetails
     ];
     foreach ($balanceTransactionDetails as $key => $value) {
@@ -316,19 +272,19 @@ class Events {
 
     // For a recurring contribution we can process charge.succeeded once we receive the event with an invoice ID.
     // For a single contribution we can't process charge.succeeded because it only triggers BEFORE the charge is captured
-    if (empty($this->getValueFromStripeObject('customer_id', 'String'))) {
+    if (empty($this->api->getValueFromStripeObject('customer_id', 'String', $this->getData()->object))) {
       $return->message = __FUNCTION__ . ' not processing because no customer_id';
       $return->ok = TRUE;
       return $return;
     }
 
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
       $return->message = __FUNCTION__ . ' Missing charge_id';
       return $return;
     }
-    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $paymentIntentID = $this->api->getValueFromStripeObject('payment_intent_id', 'String', $this->getData()->object);
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
 
     $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
     if (empty($contribution)) {
@@ -347,7 +303,7 @@ class Events {
     }
 
     // We only process charge.captured for one-off contributions
-    if (empty($this->getValueFromStripeObject('captured', 'Boolean'))) {
+    if (empty($this->api->getValueFromStripeObject('captured', 'Boolean', $this->getData()->object))) {
       $return->message = __FUNCTION__ . ' ignoring - charge not captured';
       $return->ok = TRUE;
       return $return;
@@ -359,13 +315,13 @@ class Events {
 
     // If contribution is in Pending or Failed state record payment and transition to Completed
     if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
-      $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
+      $balanceTransactionDetails = $this->api->getDetailsFromBalanceTransaction($chargeID, $this->getData()->object);
       $contributionParams = [
         'contribution_id' => $contribution['id'],
-        'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+        'trxn_date' => $this->api->getValueFromStripeObject('receive_date', 'String', $this->getData()->object),
         'order_reference' => !empty($invoiceID) ? $invoiceID : $chargeID,
         'trxn_id' => $chargeID,
-        'total_amount' => $this->getValueFromStripeObject('amount', 'Float'),
+        'total_amount' => $this->api->getValueFromStripeObject('amount', 'Float', $this->getData()->object),
         // 'fee_amount' Added below via $balanceTransactionDetails
       ];
       foreach ($balanceTransactionDetails as $key => $value) {
@@ -400,20 +356,20 @@ class Events {
     }
 
     // Cancelling an uncaptured paymentIntent triggers charge.refunded but we don't want to process that
-    if (empty(\CRM_Stripe_Api::getObjectParam('captured', $this->getData()->object))) {
+    if (empty($this->api->getValueFromStripeObject('captured', 'Boolean', $this->getData()->object))) {
       $return->ok = TRUE;
       return $return;
     }
 
     // Charge ID is required
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
       $return->message = __FUNCTION__ . ' Missing charge_id';
       return $return;
     }
 
     // Invoice ID is optional
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
 
     // This gives us the refund date + reason code
     $refunds = $this->getPaymentProcessor()->stripeClient->refunds->all(['charge' => $chargeID, 'limit' => 1]);
@@ -421,7 +377,7 @@ class Events {
 
     // Stripe does not refund fees - see https://support.stripe.com/questions/understanding-fees-for-refunded-payments
     // This gives us the actual amount refunded
-    $amountRefunded = \CRM_Stripe_Api::getObjectParam('amount_refunded', $this->getData()->object);
+    $amountRefunded = $this->api->getValueFromStripeObject('amount_refunded', 'Float', $this->getData()->object);
 
     // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
     $contribution = $this->findContribution($chargeID, $invoiceID);
@@ -498,22 +454,22 @@ class Events {
 
     // If we don't have a customer_id we can't do anything with it!
     // It's quite likely to be a fraudulent/spam so we ignore.
-    if (empty($this->getValueFromStripeObject('customer_id', 'String'))) {
+    if (empty($this->api->getValueFromStripeObject('customer_id', 'String', $this->getData()->object))) {
       $return->message = __FUNCTION__ . ' ignoring - no customer_id';
       $return->ok = TRUE;
       return $return;
     }
 
     // Charge ID is required
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
       $return->message = __FUNCTION__ . ' Missing charge_id';
       return $return;
     }
 
-    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
+    $paymentIntentID = $this->api->getValueFromStripeObject('payment_intent_id', 'String', $this->getData()->object);
     // Invoice ID is optional
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
 
     $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
     if (empty($contribution)) {
@@ -523,8 +479,8 @@ class Events {
 
     $failedContributionParams = [
       'contribution_id' => $contribution['id'],
-      'cancel_date' => $this->getValueFromStripeObject('receive_date', 'String'),
-      'cancel_reason' => $this->getValueFromStripeObject('failure_message', 'String'),
+      'cancel_date' => $this->api->getValueFromStripeObject('receive_date', 'String', $this->getData()->object),
+      'cancel_reason' => $this->api->getValueFromStripeObject('failure_message', 'String', $this->getData()->object),
     ];
     // Fallback from invoiceID to chargeID. We can't use ?? because invoiceID might be empty string ie. '' and not NULL
     $failedContributionParams['order_reference'] = empty($invoiceID) ? $chargeID : $invoiceID;
@@ -551,7 +507,7 @@ class Events {
     }
 
     // Invoice ID is required
-    $clientReferenceID = $this->getValueFromStripeObject('client_reference_id', 'String');
+    $clientReferenceID = $this->api->getValueFromStripeObject('client_reference_id', 'String', $this->getData()->object);
     if (!$clientReferenceID) {
       $return->message = __FUNCTION__ . ' Missing client_reference_id';
       return $return;
@@ -568,11 +524,11 @@ class Events {
     }
 
     // For one-off we have a paymentintentID
-    $paymentIntentID = $this->getValueFromStripeObject('payment_intent_id', 'String');
+    $paymentIntentID = $this->api->getValueFromStripeObject('payment_intent_id', 'String', $this->getData()->object);
 
     // For subscription we have invoice + subscription
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
-    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
+    $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
 
     if (!empty($invoiceID)) {
       $contributionTrxnID = $invoiceID;
@@ -652,14 +608,14 @@ class Events {
     }
 
     // Invoice ID is required
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
       $return->message = __FUNCTION__ . ' Missing invoice_id';
       return $return;
     }
 
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
-    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
+    $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
     if (empty($contributionRecur)) {
       $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
@@ -724,13 +680,13 @@ class Events {
 
     // If contribution is in Pending or Failed state record payment and transition to Completed
     if (in_array($contribution['contribution_status_id'], $statusesAllowedToComplete)) {
-      $balanceTransactionDetails = $this->getDetailsFromBalanceTransaction($chargeID);
+      $balanceTransactionDetails = $this->api->getDetailsFromBalanceTransaction($chargeID, $this->getData()->object);
       $contributionParams = [
         'contribution_id' => $contribution['id'],
-        'trxn_date' => $this->getValueFromStripeObject('receive_date', 'String'),
+        'trxn_date' => $this->api->getValueFromStripeObject('receive_date', 'String', $this->getData()->object),
         'order_reference' => $invoiceID,
         'trxn_id' => $chargeID,
-        'total_amount' => $this->getValueFromStripeObject('amount', 'String'),
+        'total_amount' => $this->api->getValueFromStripeObject('amount', 'String', $this->getData()->object),
         // 'fee_amount' Added below via $balanceTransactionDetails
         'contribution_status_id' => $contribution['contribution_status_id'],
       ];
@@ -768,14 +724,14 @@ class Events {
     }
 
     // Invoice ID is required
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
       $return->message = __FUNCTION__ . ' Missing invoice_id';
       return $return;
     }
 
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
-    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
+    $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
     if (empty($contributionRecur)) {
       $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
@@ -828,13 +784,13 @@ class Events {
     }
 
     // Invoice ID is required
-    $invoiceID = $this->getValueFromStripeObject('invoice_id', 'String');
+    $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
       $return->message = __FUNCTION__ . ' Missing invoice_id';
       return $return;
     }
 
-    $chargeID = $this->getValueFromStripeObject('charge_id', 'String');
+    $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
 
     // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
     $contribution = $this->findContribution($chargeID, $invoiceID);
@@ -853,11 +809,11 @@ class Events {
 
       if ($chargeID) {
         $stripeCharge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
-        $failureMessage = \CRM_Stripe_Api::getObjectParam('failure_message', $stripeCharge);
+        $failureMessage = $this->api->getValueFromStripeObject('failure_message', 'String', $stripeCharge);
         $failureMessage = is_string($failureMessage) ? $failureMessage : '';
       }
 
-      $receiveDate = $this->getValueFromStripeObject('receive_date', 'String');
+      $receiveDate = $this->api->getValueFromStripeObject('receive_date', 'String', $this->getData()->object);
       $params = [
         'contribution_id' => $contribution['id'],
         'order_reference' => $invoiceID,
@@ -887,7 +843,7 @@ class Events {
       return $return;
     }
 
-    $subscriptionID = $this->getValueFromStripeObject('subscription_id', 'String');
+    $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     if (!$subscriptionID) {
       $return->message = __FUNCTION__ . ' Missing subscription_id';
       return $return;
@@ -909,7 +865,7 @@ class Events {
     }
 
     // Cancel the recurring contribution
-    $this->updateRecurCancelled(['id' => $contributionRecur['id'], 'cancel_date' => $this->getValueFromStripeObject('cancel_date', 'String')]);
+    $this->updateRecurCancelled(['id' => $contributionRecur['id'], 'cancel_date' => $this->api->getValueFromStripeObject('cancel_date', 'String', $this->getData()->object)]);
 
     $return->message = __FUNCTION__ . ' contributionRecurID: ' . $contributionRecur['id'] . ' cancelled';
     $return->ok = TRUE;
