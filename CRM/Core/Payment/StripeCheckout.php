@@ -205,6 +205,9 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       // 'submit_type' => one of 'auto', pay, book, donate
       'client_reference_id' => $propertyBag->getInvoiceID(),
       'payment_method_types' => $this->getSupportedPaymentMethods($propertyBag),
+      'payment_intent_data' => [
+        'description' => $this->getDescription($propertyBag, 'description'),
+      ],
     ];
 
     // Allows you to alter the params passed to StripeCheckout (eg. payment_method_types)
