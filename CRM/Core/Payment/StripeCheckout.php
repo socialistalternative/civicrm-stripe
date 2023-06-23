@@ -266,7 +266,8 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
             'unit_amount' => $this->getAmountFormattedForStripeAPI(PropertyBag::cast(['amount' => $lineItem['unit_price'], 'currency' => $propertyBag->getCurrency()])),
             'product_data' => [
               'name' => $lineItem['field_title'],
-              'description' => $lineItem['label'],
+              // An empty label on a contribution page amounts configuration gives an empty $lineItem['label']. StripeCheckout needs it set.
+              'description' => $lineItem['label'] ?: $lineItem['field_title'],
               //'images' => ['https://example.com/t-shirt.png'],
             ],
           ],
