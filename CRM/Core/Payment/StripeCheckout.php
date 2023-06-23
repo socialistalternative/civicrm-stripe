@@ -242,6 +242,12 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
           }
           break;
 
+        case 'ach_debit':
+          if ($propertyBag->getCurrency() === 'USD') {
+            $result[] = $paymentMethod;
+          }
+          break;
+
         default:
           $result[] = $paymentMethod;
       }
