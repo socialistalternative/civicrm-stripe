@@ -37,13 +37,6 @@ require_once('BaseTest.php');
 class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
 
   protected $contributionRecurID;
-  protected $created_ts;
-
-  protected $contributionRecur = [
-    'frequency_unit' => 'month',
-    'frequency_interval' => 1,
-    'installments' => 5,
-  ];
 
   /**
    * Test creating a one-off contribution and

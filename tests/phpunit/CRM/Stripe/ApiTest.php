@@ -36,7 +36,6 @@ require_once('BaseTest.php');
 class CRM_Stripe_ApiTest extends CRM_Stripe_BaseTest {
 
   protected $contributionRecurID;
-  protected $created_ts;
 
   protected $contributionRecur = [
     'frequency_unit' => 'month',
@@ -44,8 +43,7 @@ class CRM_Stripe_ApiTest extends CRM_Stripe_BaseTest {
     'installments' => 5,
   ];
 
-  // This test is particularly dirty for some reason so we have to
-  // force a reset.
+  // This test is particularly dirty for some reason so we have to force a reset.
   public function setUpHeadless() {
     $force = FALSE;
     return \Civi\Test::headless()

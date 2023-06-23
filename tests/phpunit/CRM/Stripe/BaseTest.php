@@ -24,6 +24,8 @@ define('STRIPE_PHPUNIT_TEST', 1);
 abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implements HeadlessInterface, HookInterface, TransactionalInterface {
 
   /** @var int */
+  protected $created_ts;
+  /** @var int */
   protected $contributionID;
   /** @var int */
   protected $financialTypeID = 1;
@@ -662,4 +664,3 @@ class ValueMapOrDie implements \PHPUnit\Framework\MockObject\Stub\Stub {
   }
 
 }
-
