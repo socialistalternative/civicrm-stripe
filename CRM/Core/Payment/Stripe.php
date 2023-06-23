@@ -602,11 +602,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     $amountFormattedForStripe = $this->getAmountFormattedForStripeAPI($propertyBag);
 
-    // @fixme DO NOT SET ANYTHING ON $propertyBag or $params BELOW THIS LINE (we are reading from both)
-    $params = $this->getPropertyBagAsArray($propertyBag);
-
     // @fixme: Check if we still need to call the getBillingEmail function - eg. how does it handle "email-Primary".
-    $email = $this->getBillingEmail($params, $propertyBag->getContactID());
+    $email = $this->getBillingEmail($propertyBag, $propertyBag->getContactID());
     $propertyBag->setEmail($email);
 
     $stripeCustomer = $this->getStripeCustomer($propertyBag);
@@ -633,23 +630,21 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       //   save card functionality but should not save by default as the customer has not agreed.
       return $this->doRecurPayment($propertyBag, $amountFormattedForStripe, $stripeCustomer);
     }
-    // @fixme FROM HERE we are using $params ONLY - SET things if required ($propertyBag is not used beyond here)
-    //   Note that we set both $propertyBag and $params paymentIntentID in the case of participants above
 
     $intentParams = [
       'customer' => $stripeCustomer->id,
-      'description' => $this->getDescription($params, 'description'),
+      'description' => $this->getDescription($propertyBag, 'description'),
     ];
-    $intentParams['statement_descriptor_suffix'] = $this->getDescription($params, 'statement_descriptor_suffix');
-    $intentParams['statement_descriptor'] = $this->getDescription($params, 'statement_descriptor');
+    $intentParams['statement_descriptor_suffix'] = $this->getDescription($propertyBag, 'statement_descriptor_suffix');
+    $intentParams['statement_descriptor'] = $this->getDescription($propertyBag, 'statement_descriptor');
 
     if (!$propertyBag->has('paymentIntentID') && !empty($paymentMethodID)) {
       // We came in via a flow that did not know the amount before submit (eg. multiple event participants)
       // We need to create a paymentIntent
       $stripePaymentIntent = new CRM_Stripe_PaymentIntent($this);
-      $stripePaymentIntent->setDescription($this->getDescription($params));
+      $stripePaymentIntent->setDescription($this->getDescription($propertyBag));
       $stripePaymentIntent->setReferrer($_SERVER['HTTP_REFERER'] ?? '');
-      $stripePaymentIntent->setExtraData($params['extra_data'] ?? '');
+      $stripePaymentIntent->setExtraData($propertyBag->has('extra_data') ? $propertyBag->getCustomProperty('extra_data') : '');
 
       $paymentIntentParams = [
         'paymentMethodID' => $paymentMethodID,
@@ -680,9 +675,11 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     }
     catch (Exception $e) {
       $parsedError = $this->parseStripeException('doPayment', $e);
-      $this->handleError($parsedError['code'], $parsedError['message'], $params['error_url'], FALSE);
+      $this->handleError($parsedError['code'], $parsedError['message'], ($propertyBag->has('error_url') ? $propertyBag->getCustomProperty('error_url') : ''), FALSE);
     }
 
+    // @fixme FROM HERE we are using $params ONLY - SET things if required ($propertyBag is not used beyond here)
+    $params = $this->getPropertyBagAsArray($propertyBag);
     $params = $this->processPaymentIntent($params, $intent);
 
     // For a single charge there is no stripe invoice, we set OrderID to the ChargeID.
@@ -1065,20 +1062,23 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
   /**
    * Get a description field
-   * @param array $params
+   * @param array|PropertyBag $params
    * @param string $type
    *   One of description, statement_descriptor, statement_descriptor_suffix
    *
    * @return string
    */
-  private function getDescription($params, $type = 'description') {
+  protected function getDescription($params, string $type = 'description'): string {
+    /* @var \Civi\Payment\PropertyBag $propertyBag */
+    $propertyBag = PropertyBag::cast($params);
+
     # See https://stripe.com/docs/statement-descriptors
     # And note: both the descriptor and the descriptor suffix must have at
     # least one alphabetical character - so we ensure that all returned
     # statement descriptors minimally have an "X".
     $disallowed_characters = ['<', '>', '\\', "'", '"', '*'];
 
-    $contactContributionID = $params['contactID'] . 'X' . ($params['contributionID'] ?? 'XX');
+    $contactContributionID = $propertyBag->getContactID() . 'X' . ($propertyBag->has('contributionID') ? $propertyBag->getContributionID() : 'XX');
     switch ($type) {
       // For statement_descriptor / statement_descriptor_suffix:
       // 1. Get it from the setting if defined.
@@ -1089,7 +1089,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       case 'statement_descriptor':
         $description = trim(\Civi::settings()->get('stripe_statementdescriptor'));
         if (empty($description)) {
-          $description = trim("{$contactContributionID} {$params['description']}");
+          $description = trim("{$contactContributionID} {$propertyBag->getDescription()}");
           if (empty($description)) {
             $description = \Civi\Api4\Domain::get(FALSE)
               ->setCurrentDomain(TRUE)
@@ -1107,7 +1107,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       case 'statement_descriptor_suffix':
         $description = trim(\Civi::settings()->get('stripe_statementdescriptorsuffix'));
         if (empty($description)) {
-          $description = trim("{$contactContributionID} {$params['description']}");
+          $description = trim("{$contactContributionID} {$propertyBag->getDescription()}");
           if (empty($description)) {
             $description = \Civi\Api4\Domain::get(FALSE)
               ->setCurrentDomain(TRUE)
@@ -1124,7 +1124,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
       default:
         // The (paymentIntent) full description has no restriction on characters that are allowed/disallowed.
-        return "{$params['description']} " . $contactContributionID . " #" . ($params['invoiceID'] ?? '');
+        return "{$propertyBag->getDescription()} " . $contactContributionID . " #" . ($propertyBag->has('invoiceID') ? $propertyBag->getInvoiceID() : '');
     }
   }
 
