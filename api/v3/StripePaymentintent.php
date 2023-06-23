@@ -118,6 +118,9 @@ function _civicrm_api3_stripe_paymentintent_process_spec(&$spec) {
   $spec['capture']['title'] = E::ts('Whether we should try to capture the amount, not just confirm it');
   $spec['capture']['type'] = CRM_Utils_Type::T_BOOLEAN;
   $spec['capture']['api.default'] = FALSE;
+  $spec['setup']['title'] = E::ts('Whether we should create a setupIntent instead of a paymentIntent');
+  $spec['setup']['type'] = CRM_Utils_Type::T_BOOLEAN;
+  $spec['setup']['api.default'] = FALSE;
   $spec['description']['title'] = E::ts('Describe the payment');
   $spec['description']['type'] = CRM_Utils_Type::T_STRING;
   $spec['description']['api.default'] = NULL;
@@ -175,9 +178,9 @@ function civicrm_api3_stripe_paymentintent_process($params) {
   }
   $paymentMethodID = CRM_Utils_Type::validate($params['payment_method_id'] ?? '', 'String');
   $paymentIntentID = CRM_Utils_Type::validate($params['payment_intent_id'] ?? '', 'String');
-  $capture = CRM_Utils_Type::validate($params['capture'] ?? NULL, 'Boolean', FALSE);
+  $capture = CRM_Utils_Type::validate($params['capture'], 'Boolean', FALSE);
   $amount = CRM_Utils_Type::validate($params['amount'], 'String');
-  $setup = CRM_Utils_Type::validate($params['setup'] ?? NULL, 'Boolean', FALSE);
+  $setup = CRM_Utils_Type::validate($params['setup'], 'Boolean', FALSE);
   // $capture is normally true if we have already created the intent and just need to get extra
   //   authentication from the user (eg. on the confirmation page). So we don't need the amount
   //   in this case.
