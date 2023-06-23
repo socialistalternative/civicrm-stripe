@@ -9,6 +9,33 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.9 (not yet released)
+
+### Features
+
+* Support Stripe Checkout (https://stripe.com/en-pt/payments/checkout): Currently supports Card payments, SEPA debit (EUR), ACH debit (USD) and Google/Apple Pay.
+  * Add setting for Stripe Checkout payment methods and enable Card/SEPA/ACH.
+
+* Add custom fields for available on/payout amount/currency and retrieve from balance transaction when processing charge/invoice.
+* Add API `StripeCharge.GetBalanceTransactionDetails`.
+
+### Improvements / Fixes
+
+* Fixes for PHP8.1/8.2.
+* Multiple test improvements.
+* Check for fee in tests. Switch to getDetailsForBalanceTransaction() for all webhooks that use it.
+* Add prefix to IPN/Webhook log messages.
+* Improve parsing of Stripe exceptions.
+* Set order_reference correctly when it's empty (use trxn_id).
+* If stripe customer is stored in CiviCRM but does not exist, delete and recreate it instead of failing.
+
+#### Webhooks
+
+* Replace IPN / Webhook processing with new \Civi\Stripe\Webhook\Events processor.
+* Fix `charge.failed` webhook - handle both collapsed and expanded invoice in charge.
+* Support `checkout.session.completed` webhook event.
+
+
 ## Release 6.8.2 (2023-04-09)
 
 * Fix [#422](https://lab.civicrm.org/extensions/stripe/-/issues/422) The resource ID cannot be null or whitespace.
