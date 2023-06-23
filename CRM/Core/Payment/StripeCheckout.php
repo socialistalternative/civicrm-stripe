@@ -155,7 +155,6 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
     $failUrl = $this->getCancelUrl($paymentParams['qfKey'], NULL);
 
     // Get existing/saved Stripe customer or create a new one
-    $stripeCustomerID = NULL;
     $existingStripeCustomer = \Civi\Api4\StripeCustomer::get(FALSE)
       ->addWhere('contact_id', '=', $propertyBag->getContactID())
       ->addWhere('processor_id', '=', $this->getPaymentProcessor()['id'])
@@ -211,7 +210,13 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
     // Allows you to alter the params passed to StripeCheckout (eg. payment_method_types)
     CRM_Utils_Hook::alterPaymentProcessorParams($this, $propertyBag, $checkoutSessionParams);
 
-    $checkoutSession = $this->stripeClient->checkout->sessions->create($checkoutSessionParams);
+    try {
+      $checkoutSession = $this->stripeClient->checkout->sessions->create($checkoutSessionParams);
+    }
+    catch (Exception $e) {
+      $parsedError = $this->parseStripeException('doPayment', $e);
+      throw new PaymentProcessorException($parsedError['message']);
+    }
 
     CRM_Stripe_BAO_StripeCustomer::updateMetadata(['contact_id' => $propertyBag->getContactID()], $this, $checkoutSession['customer']);
 
