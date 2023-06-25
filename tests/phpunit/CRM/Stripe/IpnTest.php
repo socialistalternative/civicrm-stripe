@@ -1190,14 +1190,13 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
    * Returns an array of arrays of contributions.
    */
   protected function getContributionsAndAssertCount(int $expectedCount):array {
-    $contributions = civicrm_api3('Contribution', 'get', [
-      'contribution_recur_id' => $this->contributionRecurID,
-      'is_test'               => 1,
-      'options'               => ['sort' => 'id'],
-      'sequential'            => 1,
-    ]);
-    $this->assertEquals($expectedCount, $contributions['count']);
-    return $contributions['values'];
+    $contributions = \Civi\Api4\Contribution::get(FALSE)
+      ->addWhere('contribution_recur_id', '=', $this->contributionRecurID)
+      ->addWhere('is_test', '=', 1)
+      ->addOrderBy('id')
+      ->execute();
+    $this->assertEquals($expectedCount, $contributions->count());
+    return $contributions->getArrayCopy();
   }
 
   /**
