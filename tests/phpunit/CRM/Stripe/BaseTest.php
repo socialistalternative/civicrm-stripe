@@ -176,6 +176,29 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
   }
 
   /**
+   * When storing DateTime in database we have to convert to local timezone when running tests
+   * Used for checking that available_on custom field is set.
+   *
+   * @param string $dateInUTCTimezone eg. '2023-06-10 20:05:05'
+   *
+   * @return string
+   * @throws \Exception
+   */
+  public function getDateinCurrentTimezone(string $dateInUTCTimezone) {
+    // create a $dt object with the UTC timezone
+    $dt = new DateTime($dateInUTCTimezone, new DateTimeZone('UTC'));
+
+    // get the local timezone
+    $loc = (new DateTime)->getTimezone();
+
+    // change the timezone of the object without changing its time
+    $dt->setTimezone($loc);
+
+    // format the datetime
+    return $dt->format('Y-m-d H:i:s');
+  }
+
+  /**
    * Submit to stripe
    *
    * @param array $params

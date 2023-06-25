@@ -332,7 +332,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
 
     // Check we set some values on the FinancialTrxn (payment)
     $this->checkFinancialTrxn([
-      'Payment_details.available_on' => '2023-06-10 21:05:05',
+      'Payment_details.available_on' => $this->getDateinCurrentTimezone('2023-06-10 20:05:05'),
       'fee_amount' => 11.90,
       'total_amount' => $this->total,
       'order_reference' => 'ch_mock',
@@ -747,7 +747,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
 
     // Check we set some values on the FinancialTrxn (payment)
     $this->checkFinancialTrxn([
-        'Payment_details.available_on' => '2023-06-10 21:05:05',
+        'Payment_details.available_on' => $this->getDateinCurrentTimezone('2023-06-10 20:05:05'),
         'fee_amount' => 11.90,
         'total_amount' => $this->total,
         'order_reference' => 'in_mock_2',
