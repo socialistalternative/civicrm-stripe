@@ -17,6 +17,7 @@ It is supported for all payment types.
 #### MOTO (Mail Order Telephone Order) Payments
 
 If you want to take payments in this way you have to:
+
 1. Request that it is enabled on your Stripe account.
 2. Enable "MOTO payments" in CiviCRM Stripe settings.
 3. Give the "CiviCRM Stripe: Process MOTO transactions" permission to roles which are allowed to process MOTO payments (eg. administrator).
@@ -37,5 +38,6 @@ In *Administer->CiviContribute->Stripe Settings* you need to set `Country where 
 #### Supported configurations
 
 The PaymentRequest element will be displayed automatically instead of the card element if:
+
 1. The client browser has support for the paymentRequest button.
 2. The payment is a *one-off*. Recurring payments are not supported and the element will not be displayed in this case.
