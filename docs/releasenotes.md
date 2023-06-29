@@ -9,14 +9,14 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 6.9 (not yet released)
+## Release 6.9 (2023-06-29)
 
 ### Features
 
 * Support Stripe Checkout (https://stripe.com/en-pt/payments/checkout): Currently supports Card payments, SEPA debit (EUR), ACH debit (USD) and Google/Apple Pay.
   * Add setting for Stripe Checkout payment methods and enable Card/SEPA/ACH.
 
-* Add custom fields for available on/payout amount/currency and retrieve from balance transaction when processing charge/invoice.
+* Add custom fields for available on/payout amount/currency and retrieve from balance transaction when processing charge/invoice (currently does not work when charge is completed immediately (ie. single contribution)).
 * Add API `StripeCharge.GetBalanceTransactionDetails`.
 
 ### Improvements / Fixes

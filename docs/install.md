@@ -25,7 +25,14 @@ Configure a Stripe payment processor in the same way as you would for any other 
 
 All configuration is in the standard Payment Processors settings area in CiviCRM admin (**Administer menu > System Settings > Payment Processors**).
 
+#### Stripe Card Element
+
 Add a payment processor, select "Stripe" as the type and enter your
+*Publishable* and *Secret* keys and your *webhook secret* from the Stripe Dashboard.
+
+#### Stripe Checkout
+
+Add a payment processor, select "Stripe Checkout" as the type and enter your
 *Publishable* and *Secret* keys and your *webhook secret* from the Stripe Dashboard.
 
 ## Permissions

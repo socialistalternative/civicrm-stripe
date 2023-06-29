@@ -20,7 +20,7 @@ class CRM_Stripe_Check {
    * @var string
    */
   const API_VERSION = '2022-11-15';
-  const API_MIN_VERSION = '2019-12-03';
+  const API_MIN_VERSION = '2020-08-27';
 
   /**
    * @var string
