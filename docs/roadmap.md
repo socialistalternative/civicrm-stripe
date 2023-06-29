@@ -86,10 +86,6 @@ Cards are duplicated by default and we need to clean this up before we can provi
 
 See [Stripe Connect](https://stripe.com/connect).
 
-## Stripe ACH/EFT - Fully funded. Will be available in 6.7 release.
-
-See [Make it Happen](https://civicrm.org/make-it-happen/stripe-ach-payments) campaign on CiviCRM.org.
-
 ## Bancontact
 
 See [Stripe documentation - bancontact](https://stripe.com/docs/payments/bancontact)
@@ -145,3 +141,9 @@ $planId = "every-{$params['recurFrequencyInterval']}-{$params['recurFrequencyUni
 ```
 
 ### Estimate: 12-16 hours.
+
+# Completed
+
+## Stripe ACH/EFT - Available in 6.9 release.
+
+See [Make it Happen](https://civicrm.org/make-it-happen/stripe-ach-payments) campaign on CiviCRM.org.
