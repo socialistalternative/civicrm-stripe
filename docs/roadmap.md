@@ -144,6 +144,6 @@ $planId = "every-{$params['recurFrequencyInterval']}-{$params['recurFrequencyUni
 
 # Completed
 
-## Stripe ACH/EFT - Available in 6.9 release.
+## Stripe ACH/EFT - Available in 6.9 release via Stripe Checkout.
 
 See [Make it Happen](https://civicrm.org/make-it-happen/stripe-ach-payments) campaign on CiviCRM.org.
