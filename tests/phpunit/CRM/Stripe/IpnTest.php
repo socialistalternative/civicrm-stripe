@@ -74,6 +74,84 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
   }
 
   /**
+   * Test "direct" creation (ie. contribution page) where contribution is Completed immediately.
+   */
+  public function testNewOneOffChargeSucceededAlreadyCompleted() {
+    // Run "payment".
+    $doPaymentResult = $this->mockOneOffPaymentSetup();
+
+    // Now add a "Completed" payment per contribution page flow
+    if ($doPaymentResult['payment_status'] === 'Completed') {
+      civicrm_api3('Payment', 'create', [
+        'trxn_id' => $doPaymentResult['trxn_id'],
+        'total_amount' => $this->total,
+        'fee_amount' => $doPaymentResult['fee_amount'],
+        'order_reference' => $doPaymentResult['order_reference'],
+        'contribution_id' => $this->contributionID,
+      ]);
+    }
+
+    // Contribution should be marked as Completed
+    $this->checkContrib([
+      'contribution_status_id' => 'Completed',
+      'trxn_id'                => 'ch_mock',
+      'total_amount'           => $this->total,
+    ]);
+    // Financial trxn should have empty "available_on" at this point
+    $this->checkFinancialTrxn([
+      'Payment_details.available_on' => '',
+      'fee_amount' => 11.90,
+      'total_amount' => $this->total,
+      'order_reference' => 'ch_mock',
+      'trxn_id' => 'ch_mock'
+    ],
+      $this->contributionID
+    );
+
+    $success = $this->simulateEvent([
+      'type'             => 'charge.succeeded',
+      'id'               => 'evt_mock',
+      'object'           => 'event', // ?
+      'livemode'         => FALSE,
+      'pending_webhooks' => 0,
+      'request'          => [ 'id' => NULL ],
+      'data'             => [
+        'object' => [
+          'id'           => 'ch_mock',
+          'object'       => 'charge',
+          'customer'     => 'cus_mock',
+          'charge'       => 'ch_mock',
+          'balance_transaction' => 'txn_mock',
+          'created'      => time(),
+          'amount'       => $this->total*100,
+          'currency'     => 'usd',
+          'status'       => 'succeeded',
+          "captured"     => TRUE,
+        ]
+      ],
+    ]);
+    $this->assertEquals(TRUE, $success, 'IPN did not return OK');
+
+    // No change here.
+    $this->checkContrib([
+      'contribution_status_id' => 'Completed',
+      'trxn_id'                => 'ch_mock',
+      'total_amount'           => $this->total,
+    ]);
+
+    // Now we should have a value for available_on
+    $this->checkFinancialTrxn([
+        'Payment_details.available_on' => $this->getDateinCurrentTimezone('2023-06-10 20:05:05'),
+        'fee_amount' => 11.90,
+        'total_amount' => $this->total,
+        'order_reference' => 'ch_mock',
+        'trxn_id' => 'ch_mock'
+      ],
+      $this->contributionID
+    );
+  }
+
+  /**
    * Test completing a one-off contribution with trxn_id = paymentIntentID
    * For Stripe checkout we find the contribution using contribution.invoice_id=checkout.client_reference_id
    * Then we set the contribution.trxn_id=checkout.payment_intent_id (we don't have charge_id yet)
@@ -1255,173 +1333,6 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       ]));
 
     return [$mockCharge1, $mockCharge2, $mockInvoice2, $balanceTransaction2];
-  }
-
-  protected function getMocksForOneOffPayment() {
-    PropertySpy::$buffer = 'none';
-    // Set this to 'print' or 'log' maybe more helpful in debugging but for
-    // generally running tests 'exception' suits as we don't expect any output.
-    PropertySpy::$outputMode = 'exception';
-
-    // Create a mock stripe client.
-    $stripeClient = $this->createMock('Stripe\\StripeClient');
-    // Update our CRM_Core_Payment_Stripe object and ensure any others
-    // instantiated separately will also use it.
-    $this->paymentObject->setMockStripeClient($stripeClient);
-
-    // Mock the payment methods service.
-    $mockPaymentMethod = $this->createMock('Stripe\\PaymentMethod');
-    $mockPaymentMethod->method('__get')
-      ->will($this->returnValueMap([
-        [ 'id', 'pm_mock']
-      ]));
-    $stripeClient->paymentMethods = $this->createMock('Stripe\\Service\\PaymentMethodService');
-    $stripeClient->paymentMethods
-      ->method('create')
-      ->willReturn($mockPaymentMethod);
-    $stripeClient->paymentMethods
-      ->method('retrieve')
-      ->with($this->equalTo('pm_mock'))
-      ->willReturn($mockPaymentMethod);
-
-    // Mock the Customers service
-    $stripeClient->customers = $this->createMock('Stripe\\Service\\CustomerService');
-    $stripeClient->customers
-      ->method('create')
-      ->willReturn(
-        new PropertySpy('customers.create', ['id' => 'cus_mock'])
-      );
-    $stripeClient->customers
-      ->method('retrieve')
-      ->with($this->equalTo('cus_mock'))
-      ->willReturn(
-        new PropertySpy('customers.retrieve', ['id' => 'cus_mock'])
-      );
-
-    // Need a mock intent with id and status
-    $mockCharge = $this->createMock('Stripe\\Charge');
-    $mockCharge
-      ->method('__get')
-      ->will($this->returnValueMap([
-        ['id', 'ch_mock'],
-        ['captured', TRUE],
-        ['status', 'succeeded'],
-        ['balance_transaction', 'txn_mock'],
-      ]));
-
-    $mockChargesCollection = new \Stripe\Collection();
-    $mockChargesCollection->data = [$mockCharge];
-
-    $mockCharge = new PropertySpy('Charge', [
-      'id' => 'ch_mock',
-      'object' => 'charge',
-      'captured' => TRUE,
-      'status' => 'succeeded',
-      'balance_transaction' => 'txn_mock',
-      'amount' => $this->total * 100,
-    ]);
-    $stripeClient->charges = $this->createMock('Stripe\\Service\\ChargeService');
-    $stripeClient->charges
-      ->method('retrieve')
-      ->with($this->equalTo('ch_mock'))
-      ->willReturn($mockCharge);
-
-    $mockPaymentIntent = new PropertySpy('PaymentIntent', [
-      'id' => 'pi_mock',
-      'status' => 'succeeded',
-      'latest_charge' => 'ch_mock'
-    ]);
-
-    $stripeClient->paymentIntents = $this->createMock('Stripe\\Service\\PaymentIntentService');
-    $stripeClient->paymentIntents
-      ->method('retrieve')
-      ->with($this->equalTo('pi_mock'))
-      ->willReturn($mockPaymentIntent);
-
-    $mockPaymentIntentWithAmount = new PropertySpy('PaymentIntent', [
-      'id' => 'pi_mock',
-      'status' => 'succeeded',
-      'latest_charge' => 'ch_mock',
-      'amount' => '40000',
-    ]);
-    $stripeClient->paymentIntents
-      ->method('update')
-      ->with($this->equalTo('pi_mock'))
-      ->willReturn($mockPaymentIntentWithAmount);
-
-    $stripeClient->balanceTransactions = $this->createMock('Stripe\\Service\\BalanceTransactionService');
-    $stripeClient->balanceTransactions
-      ->method('retrieve')
-      ->with($this->equalTo('txn_mock'))
-      ->willReturn(new PropertySpy('balanceTransaction', [
-        'id' => 'txn_mock',
-        'fee' => 1190, /* means $11.90 */
-        'currency' => 'usd',
-        'exchange_rate' => NULL,
-        'object' => 'balance_transaction',
-        'available_on'  => '1686427505' // 2023-06-10 21:05:05
-      ]));
-
-    $mockRefund = new PropertySpy('Refund', [
-      'amount_refunded' => $this->total*100,
-      'charge_id' => 'ch_mock', //xxx
-      'created' => time(),
-      'currency' => 'usd',
-      'id' => 're_mock',
-      'object' => 'refund',
-    ]);
-    $stripeClient->refunds = $this->createMock('Stripe\\Service\\RefundService');
-    $stripeClient->refunds
-      ->method('all')
-      ->willReturn(new PropertySpy('refunds.all', [ 'data' => [ $mockRefund ] ]));
-  }
-
-  /**
-   * DRY code. Sets up the database as it would be after a recurring contrib
-   * has been set up with Stripe.
-   *
-   * Results in a pending ContributionRecur and a pending Contribution record.
-   *
-   * The following mock Stripe IDs strings are used:
-   *
-   * - pm_mock   PaymentMethod
-   * - pi_mock   PaymentIntent
-   * - cus_mock  Customer
-   * - ch_mock   Charge
-   * - txn_mock  Balance transaction
-   * - sub_mock  Subscription
-   *
-   * @return array The result from doPayment()
-   * @throws \CRM_Core_Exception
-   * @throws \CiviCRM_API3_Exception
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   * @throws \Stripe\Exception\ApiErrorException
-   */
-  protected function mockOneOffPaymentSetup(): array {
-    $this->getMocksForOneOffPayment();
-
-    $this->setupPendingContribution();
-    // Submit the payment.
-    $payment_extra_params = [
-      'contributionID'      => $this->contributionID,
-      'paymentIntentID'     => 'pi_mock',
-    ];
-
-    // Simulate payment
-    $this->assertInstanceOf('CRM_Core_Payment_Stripe', $this->paymentObject);
-    $doPaymentResult = $this->doPaymentStripe($payment_extra_params);
-
-    //
-    // Check the Contribution
-    // ...should be pending
-    // ...its transaction ID should be our Charge ID.
-    //
-    $this->checkContrib([
-      'contribution_status_id' => 'Pending',
-      'trxn_id'                => 'ch_mock',
-    ]);
-
-    return $doPaymentResult;
   }
 
   /**

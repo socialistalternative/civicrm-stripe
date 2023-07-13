@@ -311,6 +311,7 @@ class Events {
 
     $pendingContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Pending');
     $failedContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Failed');
+    $completedContributionStatusID = (int) \CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Completed');
     $statusesAllowedToComplete = [$pendingContributionStatusID, $failedContributionStatusID];
 
     // If contribution is in Pending or Failed state record payment and transition to Completed
@@ -329,6 +330,40 @@ class Events {
       }
 
       $this->updateContributionCompleted($contributionParams);
+    }
+    elseif ($contribution['contribution_status_id'] === $completedContributionStatusID) {
+      // By this point we should have a contribution and a completed payment
+      $financialTrxn = \Civi\Api4\FinancialTrxn::get(FALSE)
+        ->addSelect('*', 'custom.*')
+        ->addWhere('trxn_id', '=', $chargeID)
+        ->addWhere('is_payment', '=', TRUE)
+        ->addWhere('status_id:name', '=', 'Completed')
+        ->execute()
+        ->first();
+      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'] . ' already completed. No additional payment details added';
+      if (empty($financialTrxn['Payment_details.available_on'])) {
+        $balanceTransactionDetails = $this->api->getDetailsFromBalanceTransaction($chargeID, $this->getData()->object);
+        foreach ($balanceTransactionDetails as $key => $value) {
+          $paymentParams[$key] = $value;
+        }
+
+        $customFields = \Civi\Api4\CustomField::get(FALSE)
+          ->addWhere('custom_group_id:name', '=', 'Payment_details')
+          ->execute()
+          ->indexBy('name');
+        foreach ($customFields as $key => $value) {
+          if (isset($paymentParams[$key])) {
+            $customParams['custom_' . $value['id']] = $paymentParams[$key];
+          }
+        }
+        if (!empty($customParams)) {
+          $customParams['entity_id'] = $financialTrxn['id'];
+          civicrm_api3('CustomValue', 'create', $customParams);
+          $return->message = __FUNCTION__  . ' contributionID: ' . $contribution['id'] . ' already completed. Added additional payment details';
+        }
+      }
+      $return->ok = TRUE;
+      return $return;
     }
 
     $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
