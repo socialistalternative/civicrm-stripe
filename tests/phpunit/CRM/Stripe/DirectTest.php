@@ -52,8 +52,4 @@ class CRM_Stripe_DirectTest extends CRM_Stripe_BaseTest {
     ]);
   }
 
-  public function testDummy() {
-    return;
-  }
-
 }
