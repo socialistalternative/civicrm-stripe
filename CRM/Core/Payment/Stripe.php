@@ -348,8 +348,9 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       $plan = $this->stripeClient->plans->retrieve($planId);
     }
     catch (\Stripe\Exception\InvalidRequestException $e) {
-      $err = $this->parseStripeException('plan_retrieve', $e);
-      if ($err['code'] === 'resource_missing') {
+      // The following call is just for logging's sake.
+      $this->parseStripeException('plan_retrieve', $e);
+      if ($e->getError()->code === 'resource_missing') {
         $formatted_amount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $currency);
         $productName = "CiviCRM " . (isset($params['membership_name']) ? $params['membership_name'] . ' ' : '') . "every {$params['recurFrequencyInterval']} {$params['recurFrequencyUnit']}(s) {$currency}{$formatted_amount}";
         if ($this->_paymentProcessor['is_test']) {
