@@ -387,7 +387,7 @@ class CRM_Core_Payment_StripeIPN {
   /**
    * Process the given webhook
    *
-   * @return bool
+   * @return stdClass
    * @throws \API_Exception
    * @throws \Civi\API\Exception\UnauthorizedException
    */
