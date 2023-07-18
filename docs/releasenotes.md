@@ -9,6 +9,11 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.9.1 (2023-07-18)
+
+* Fix recording balancetransaction details (eg. available_on) on FinancialTrxn when payment is completed immediately (eg. Contribution page) and add tests to cover this scenario.
+* Fix [#440](https://lab.civicrm.org/extensions/stripe/-/issues/440) Fails to create a plan if one doesn't exist.
+
 ## Release 6.9 (2023-06-29)
 
 ### Features
