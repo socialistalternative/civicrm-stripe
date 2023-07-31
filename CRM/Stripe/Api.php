@@ -279,7 +279,7 @@ class CRM_Stripe_Api {
       // 'afterpay_clearpay',
       // 'alipay',
       // 'au_becs_debit',
-      // 'bacs_debit',
+      'bacs_debit' => E::ts('BACS Direct Debit'),
       // 'bancontact',
       // 'blik',
       // 'boleto',

@@ -205,10 +205,19 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       // 'submit_type' => one of 'auto', pay, book, donate
       'client_reference_id' => $propertyBag->getInvoiceID(),
       'payment_method_types' => $this->getSupportedPaymentMethods($propertyBag),
-      'payment_intent_data' => [
-        'description' => $this->getDescription($propertyBag, 'description'),
-      ],
     ];
+
+    // Stripe Error:
+    // Stripe\Exception\InvalidRequestException: You can not pass `payment_intent_data` in `subscription` mode.
+    if ($propertyBag->getIsRecur()) {
+      $checkoutSessionParams['subscription_data'] = [
+        'description' => $this->getDescription($propertyBag, 'description'),
+      ];
+    }else {
+      $checkoutSessionParams['payment_intent_data'] = [
+        'description' => $this->getDescription($propertyBag, 'description'),
+      ];
+    }
 
     // Allows you to alter the params passed to StripeCheckout (eg. payment_method_types)
     CRM_Utils_Hook::alterPaymentProcessorParams($this, $propertyBag, $checkoutSessionParams);
