@@ -252,6 +252,28 @@ class Events {
   }
 
   /**
+   * Format the message that is returned from the event processor
+   *
+   * @param string $function
+   * @param string $message
+   * @param array $entityIDs
+   *
+   * @return string
+   */
+  private function formatResultMessage(string $function, string $message, array $entityIDs = []): string {
+    $resultMessage = $function . ': ' . $message;
+    if (!empty($entityIDs)) {
+      $entityStrings = [];
+      foreach ($entityIDs as $entityName => $entityID) {
+        $entityStrings[] = $entityName . ':' . $entityID;
+      }
+      $resultMessage = $resultMessage . '. ' . implode(';', $entityStrings);
+    }
+
+    return $resultMessage;
+  }
+
+  /**
    * Webhook event: charge.succeeded / charge.captured
    * We process charge.succeeded per charge.captured
    *
@@ -266,21 +288,21 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'charge') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // For a recurring contribution we can process charge.succeeded once we receive the event with an invoice ID.
     // For a single contribution we can't process charge.succeeded because it only triggers BEFORE the charge is captured
     if (empty($this->api->getValueFromStripeObject('customer_id', 'String', $this->getData()->object))) {
-      $return->message = __FUNCTION__ . ' not processing because no customer_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'not processing because no customer_id');
       $return->ok = TRUE;
       return $return;
     }
 
     $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
-      $return->message = __FUNCTION__ . ' Missing charge_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing charge_id');
       return $return;
     }
     $paymentIntentID = $this->api->getValueFromStripeObject('payment_intent_id', 'String', $this->getData()->object);
@@ -288,7 +310,7 @@ class Events {
 
     $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
     if (empty($contribution)) {
-      $return->message = __FUNCTION__ . ' ignoring - contribution not found';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - contribution not found');
       $return->ok = TRUE;
       return $return;
     }
@@ -297,14 +319,14 @@ class Events {
 
     // We only process charge.captured for one-off contributions (see invoice.paid/invoice.payment_succeeded for recurring)
     if (!empty($contribution['contribution_recur_id'])) {
-      $return->message = __FUNCTION__ . ' ignoring - contribution has recur';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - contribution has recur');
       $return->ok = TRUE;
       return $return;
     }
 
     // We only process charge.captured for one-off contributions
     if (empty($this->api->getValueFromStripeObject('captured', 'Boolean', $this->getData()->object))) {
-      $return->message = __FUNCTION__ . ' ignoring - charge not captured';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - charge not captured');
       $return->ok = TRUE;
       return $return;
     }
@@ -340,7 +362,7 @@ class Events {
         ->addWhere('status_id:name', '=', 'Completed')
         ->execute()
         ->first();
-      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'] . ' already completed. No additional payment details added';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'already completed. No additional payment details added', ['coid' => $contribution['id']]);
       if (empty($financialTrxn['Payment_details.available_on'])) {
         $balanceTransactionDetails = $this->api->getDetailsFromBalanceTransaction($chargeID, $this->getData()->object);
         foreach ($balanceTransactionDetails as $key => $value) {
@@ -359,14 +381,14 @@ class Events {
         if (!empty($customParams)) {
           $customParams['entity_id'] = $financialTrxn['id'];
           civicrm_api3('CustomValue', 'create', $customParams);
-          $return->message = __FUNCTION__  . ' contributionID: ' . $contribution['id'] . ' already completed. Added additional payment details';
+          $return->message = $this->formatResultMessage(__FUNCTION__, 'already completed. Added additional payment details', ['coid' => $contribution['id']]);
         }
       }
       $return->ok = TRUE;
       return $return;
     }
 
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     $return->ok = TRUE;
     return $return;
   }
@@ -386,7 +408,7 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'charge') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
@@ -399,7 +421,7 @@ class Events {
     // Charge ID is required
     $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
-      $return->message = __FUNCTION__ . ' Missing charge_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing charge_id');
       return $return;
     }
 
@@ -417,14 +439,14 @@ class Events {
     // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
     $contribution = $this->findContribution($chargeID, $invoiceID);
     if (empty($contribution)) {
-      $return->message = __FUNCTION__ . ' Contribution not found';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Contribution not found');
       return $return;
     }
 
     if (isset($contribution['payments'])) {
       foreach ($contribution['payments'] as $payment) {
         if ($payment['trxn_id'] === $refund->id) {
-          $return->message = __FUNCTION__ . ' Refund ' . $refund->id . ' already recorded in CiviCRM';
+          $return->message = $this->formatResultMessage(__FUNCTION__, 'Refund already recorded in CiviCRM', ['refund ID' => $refund->id]);
           $return->ok = TRUE;
           return $return;
         }
@@ -458,12 +480,12 @@ class Events {
       'total_amount' => $refundParams['total_amount'],
     ]);
     if (!empty($refundPayment['count'])) {
-      $return->message = __FUNCTION__ . ' Refund already recorded. Contribution ID: ' . $contribution['id'];
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Refund already recorded', ['coid' => $contribution['id']]);
       $return->ok = TRUE;
     }
     else {
       $this->updateContributionRefund($refundParams);
-      $return->message = __FUNCTION__ . 'Refund recorded. Contribution ID: ' . $contribution['id'];
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Refund recorded', ['coid' => $contribution['id']]);
       $return->ok = TRUE;
     }
     $lock->release();
@@ -483,14 +505,14 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'charge') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // If we don't have a customer_id we can't do anything with it!
     // It's quite likely to be a fraudulent/spam so we ignore.
     if (empty($this->api->getValueFromStripeObject('customer_id', 'String', $this->getData()->object))) {
-      $return->message = __FUNCTION__ . ' ignoring - no customer_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - no customer_id');
       $return->ok = TRUE;
       return $return;
     }
@@ -498,7 +520,7 @@ class Events {
     // Charge ID is required
     $chargeID = $this->api->getValueFromStripeObject('charge_id', 'String', $this->getData()->object);
     if (!$chargeID) {
-      $return->message = __FUNCTION__ . ' Missing charge_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing charge_id');
       return $return;
     }
 
@@ -508,7 +530,7 @@ class Events {
 
     $contribution = $this->findContribution($chargeID, $invoiceID, '', $paymentIntentID);
     if (empty($contribution)) {
-      $return->message = __FUNCTION__ . ' Contribution not found';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Contribution not found');
       return $return;
     }
 
@@ -521,7 +543,7 @@ class Events {
     $failedContributionParams['order_reference'] = empty($invoiceID) ? $chargeID : $invoiceID;
     $this->updateContributionFailed($failedContributionParams);
 
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     $return->ok = TRUE;
     return $return;
 
@@ -537,14 +559,14 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'checkout.session') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // Invoice ID is required
     $clientReferenceID = $this->api->getValueFromStripeObject('client_reference_id', 'String', $this->getData()->object);
     if (!$clientReferenceID) {
-      $return->message = __FUNCTION__ . ' Missing client_reference_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing client_reference_id');
       return $return;
     }
 
@@ -554,7 +576,7 @@ class Events {
       ->execute()
       ->first();
     if (empty($contribution)) {
-      $return->message = __FUNCTION__ . ' contribution not found for client_reference_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'contribution not found for client_reference_id');
       return $return;
     }
 
@@ -572,7 +594,7 @@ class Events {
       $contributionTrxnID = $paymentIntentID;
     }
     else {
-      $return->message = __FUNCTION__ . ' Missing invoiceID or paymentIntentID';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing invoiceID or paymentIntentID');
       return $return;
     }
     Contribution::update(FALSE)
@@ -606,10 +628,10 @@ class Events {
         ->addValue('processed_date', NULL)
         ->addWhere('id', '=', $chargeSucceededWebhook['id'])
         ->execute();
-      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'] . ' charge.succeeded flagged for re-process';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'charge.succeeded flagged for re-process', ['coid' => $contribution['id']]);
     }
     else {
-      $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+      $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     }
 
     $return->ok = TRUE;
@@ -638,14 +660,14 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'invoice') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // Invoice ID is required
     $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
-      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing invoice_id');
       return $return;
     }
 
@@ -653,7 +675,7 @@ class Events {
     $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
     if (empty($contributionRecur)) {
-      $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+      $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No contributionRecur record found in CiviCRM. Ignored'));
       $return->ok = TRUE;
       return $return;
     }
@@ -674,7 +696,7 @@ class Events {
       if (empty($contributionRecur['id'])) {
         // Hmmm. We could not find the contribution recur record either. Silently ignore this event(!)
         $return->ok = TRUE;
-        $return->message = __FUNCTION__ . ': ' . E::ts('No contribution or recur record found in CiviCRM. Ignored.');
+        $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No contribution or recur record found in CiviCRM. Ignored'));
         return $return;
       }
       else {
@@ -705,7 +727,7 @@ class Events {
       ])['count'] > 0) {
       // Payment already recorded
       $return->ok = TRUE;
-      $return->message = __FUNCTION__ . ': ' . E::ts('Payment already recorded');
+      $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('Payment already recorded'), ['coid' => $contribution['id']]);
       return $return;
     }
 
@@ -735,7 +757,7 @@ class Events {
     $lock->release();
 
     $this->handleInstallmentsForSubscription($subscriptionID, $contributionRecur['id']);
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     $return->ok = TRUE;
     return $return;
   }
@@ -754,14 +776,14 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'invoice') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // Invoice ID is required
     $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
-      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing invoice_id');
       return $return;
     }
 
@@ -769,7 +791,7 @@ class Events {
     $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
     if (empty($contributionRecur)) {
-      $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+      $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No contributionRecur record found in CiviCRM. Ignored'));
       $return->ok = TRUE;
       return $return;
     }
@@ -795,7 +817,7 @@ class Events {
         'trxn_id' => $invoiceID,
       ]);
     }
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     $return->ok = TRUE;
     return $return;
   }
@@ -814,14 +836,14 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'invoice') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     // Invoice ID is required
     $invoiceID = $this->api->getValueFromStripeObject('invoice_id', 'String', $this->getData()->object);
     if (!$invoiceID) {
-      $return->message = __FUNCTION__ . ' Missing invoice_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing invoice_id');
       return $return;
     }
 
@@ -830,7 +852,7 @@ class Events {
     // Get the CiviCRM contribution that matches the Stripe metadata we have from the event
     $contribution = $this->findContribution($chargeID, $invoiceID);
     if (empty($contribution)) {
-      $return->message = __FUNCTION__ . ' Contribution not found';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Contribution not found');
       return $return;
     }
 
@@ -857,7 +879,7 @@ class Events {
       ];
       $this->updateContributionFailed($params);
     }
-    $return->message = __FUNCTION__ . ' contributionID: ' . $contribution['id'];
+    $return->message = $this->formatResultMessage(__FUNCTION__, '', ['coid' => $contribution['id']]);
     $return->ok = TRUE;
     return $return;
   }
@@ -874,13 +896,13 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'subscription') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
     $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
     if (!$subscriptionID) {
-      $return->message = __FUNCTION__ . ' Missing subscription_id';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Missing subscription_id');
       return $return;
     }
 
@@ -890,7 +912,7 @@ class Events {
       $result = [];
       \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'subscription_not_found', $result);
       if (empty($result['contributionRecur'])) {
-        $return->message = __FUNCTION__ . ': ' . E::ts('No contributionRecur record found in CiviCRM. Ignored.');
+        $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No contributionRecur record found in CiviCRM. Ignored'));
         $return->ok = TRUE;
         return $return;
       }
@@ -902,7 +924,7 @@ class Events {
     // Cancel the recurring contribution
     $this->updateRecurCancelled(['id' => $contributionRecur['id'], 'cancel_date' => $this->api->getValueFromStripeObject('cancel_date', 'String', $this->getData()->object)]);
 
-    $return->message = __FUNCTION__ . ' contributionRecurID: ' . $contributionRecur['id'] . ' cancelled';
+    $return->message = $this->formatResultMessage(__FUNCTION__, 'cancelled', ['crid' => $contributionRecur['id']]);
     $return->ok = TRUE;
     return $return;
   }
@@ -917,11 +939,11 @@ class Events {
 
     // Check we have the right data object for this event
     if (($this->getData()->object['object'] ?? '') !== 'subscription') {
-      $return->message = __FUNCTION__ . ' Invalid object type';
+      $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
 
-    $return->message = __FUNCTION__ . ' ignoring - not implemented';
+    $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - not implemented');
     $return->ok = TRUE;
     return $return;
   }
