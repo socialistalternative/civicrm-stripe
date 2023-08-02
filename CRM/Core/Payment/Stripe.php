@@ -10,6 +10,7 @@
  */
 
 use Brick\Money\Money;
+use Civi\Api4\ContributionRecur;
 use Civi\Api4\PaymentprocessorWebhook;
 use CRM_Stripe_ExtensionUtil as E;
 use Civi\Payment\PropertyBag;
@@ -329,14 +330,13 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
   /**
    * Create or update a Stripe Plan
    *
-   * @param array $params
+   * @param \Civi\Payment\PropertyBag $propertyBag
    * @param integer $amount
    *
    * @return \Stripe\Plan
    */
-  public function createPlan(array $params, int $amount): \Stripe\Plan {
-    $currency = $this->getCurrency($params);
-    $planId = "every-{$params['recurFrequencyInterval']}-{$params['recurFrequencyUnit']}-{$amount}-" . strtolower($currency);
+  public function createPlan(\Civi\Payment\PropertyBag $propertyBag, int $amount): \Stripe\Plan {
+    $planId = "every-{$propertyBag->getRecurFrequencyInterval()}-{$propertyBag->getRecurFrequencyUnit()}-{$amount}-" . strtolower($propertyBag->getCurrency());
 
     if ($this->_paymentProcessor['is_test']) {
       $planId .= '-test';
@@ -351,8 +351,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       // The following call is just for logging's sake.
       $this->parseStripeException('plan_retrieve', $e);
       if ($e->getError()->code === 'resource_missing') {
-        $formatted_amount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $currency);
-        $productName = "CiviCRM " . (isset($params['membership_name']) ? $params['membership_name'] . ' ' : '') . "every {$params['recurFrequencyInterval']} {$params['recurFrequencyUnit']}(s) {$currency}{$formatted_amount}";
+        $formatted_amount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $propertyBag->getCurrency());
+        $productName = "CiviCRM " . ($propertyBag->has('membership_name') ? $propertyBag->getCustomProperty('membership_name') . ' ' : '') . "every {$propertyBag->getRecurFrequencyInterval()} {$propertyBag->getRecurFrequencyUnit()}(s) {$propertyBag->getCurrency()}{$formatted_amount}";
         if ($this->_paymentProcessor['is_test']) {
           $productName .= '-test';
         }
@@ -363,11 +363,11 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         // Create a new Plan.
         $stripePlan = [
           'amount' => $amount,
-          'interval' => $params['recurFrequencyUnit'],
+          'interval' => $propertyBag->getRecurFrequencyUnit(),
           'product' => $product->id,
-          'currency' => $currency,
+          'currency' => $propertyBag->getCurrency(),
           'id' => $planId,
-          'interval_count' => $params['recurFrequencyInterval'],
+          'interval_count' => $propertyBag->getRecurFrequencyInterval(),
         ];
         $plan = $this->stripeClient->plans->create($stripePlan);
       }
@@ -779,10 +779,16 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @throws \CRM_Core_Exception
    */
   public function doRecurPayment(\Civi\Payment\PropertyBag $propertyBag, int $amountFormattedForStripe, $stripeCustomer): array {
+    // Make sure recurFrequencyInterval is set (default to 1 if not)
+    if (!$propertyBag->has('recurFrequencyInterval') || $propertyBag->getRecurFrequencyInterval() === 0) {
+      $propertyBag->setRecurFrequencyInterval(1);
+    }
+
     $params = $this->getPropertyBagAsArray($propertyBag);
 
     // @fixme FROM HERE we are using $params array (but some things are READING from $propertyBag)
 
+    // @fixme: Split this out into "$returnParams"
     // We set payment status as pending because the IPN will set it as completed / failed
     $params = $this->setStatusPaymentPending($params);
 
@@ -790,7 +796,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     if (empty($this->getRecurringContributionId($propertyBag))) {
       $required = 'contributionRecurID';
     }
-    if (!isset($params['recurFrequencyUnit'])) {
+
+    if (!$propertyBag->has('recurFrequencyUnit')) {
       $required = 'recurFrequencyUnit';
     }
     if ($required) {
@@ -798,17 +805,14 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       throw new CRM_Core_Exception($this->getLogPrefix() . 'doRecurPayment: Missing mandatory parameter: ' . $required);
     }
 
-    // Make sure recurFrequencyInterval is set (default to 1 if not)
-    empty($params['recurFrequencyInterval']) ? $params['recurFrequencyInterval'] = 1 : NULL;
-
     // Create the stripe plan
-    $planId = self::createPlan($params, $amountFormattedForStripe);
+    $planId = self::createPlan($propertyBag, $amountFormattedForStripe);
 
     // Attach the Subscription to the Stripe Customer.
     $subscriptionParams = [
       'proration_behavior' => 'none',
       'plan' => $planId,
-      'metadata' => ['Description' => $params['description']],
+      'metadata' => ['Description' => $propertyBag->getDescription()],
       'expand' => ['latest_invoice.payment_intent'],
       'customer' => $stripeCustomer->id,
       'off_session' => TRUE,
@@ -825,23 +829,21 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     $this->setPaymentProcessorSubscriptionID($stripeSubscription->id);
 
     $nextScheduledContributionDate = $this->calculateNextScheduledDate($params);
-    $contributionRecur = \Civi\Api4\ContributionRecur::update(FALSE)
+    $contributionRecur = ContributionRecur::update(FALSE)
       ->addWhere('id', '=', $this->getRecurringContributionId($propertyBag))
       ->addValue('processor_id', $this->getPaymentProcessorSubscriptionID())
       ->addValue('auto_renew', 1)
       ->addValue('next_sched_contribution_date', $nextScheduledContributionDate)
       ->addValue('cycle_day', date('d', strtotime($nextScheduledContributionDate)));
 
-    if (!empty($params['installments'])) {
+    if ($propertyBag->has('installments') && ($propertyBag->getRecurInstallments() > 0)) {
       // We set an end date if installments > 0
       if (empty($params['receive_date'])) {
         $params['receive_date'] = date('YmdHis');
       }
-      if ($params['installments']) {
-        $contributionRecur
-          ->addValue('end_date', $this->calculateEndDate($params))
-          ->addValue('installments', $params['installments']);
-      }
+      $contributionRecur
+        ->addValue('end_date', $this->calculateEndDate($params))
+        ->addValue('installments', $propertyBag->getRecurInstallments());
     }
 
     if ($stripeSubscription->status === 'incomplete') {
