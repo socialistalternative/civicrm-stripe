@@ -629,6 +629,10 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       // This is where we save the customer card
       // @todo For a recurring payment we have to save the card. For a single payment we'd like to develop the
       //   save card functionality but should not save by default as the customer has not agreed.
+      if (empty($paymentMethodID)) {
+        \Civi::log('stripe')->error($this->getLogPrefix() . 'recur payment but missing paymentmethod. Check form config');
+        throw new PaymentProcessorException('Payment form is not configured correctly!');
+      }
       return $this->doRecurPayment($propertyBag, $amountFormattedForStripe, $stripeCustomer);
     }
 
