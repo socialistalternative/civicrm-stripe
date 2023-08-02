@@ -213,7 +213,8 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       $checkoutSessionParams['subscription_data'] = [
         'description' => $this->getDescription($propertyBag, 'description'),
       ];
-    }else {
+    }
+    else {
       $checkoutSessionParams['payment_intent_data'] = [
         'description' => $this->getDescription($propertyBag, 'description'),
       ];
@@ -246,7 +247,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
   private function getSupportedPaymentMethods(\Civi\Payment\PropertyBag $propertyBag): array {
     $paymentMethods = \Civi::settings()->get('stripe_checkout_supported_payment_methods');
     $result = [];
-    foreach ($paymentMethods as $index => $paymentMethod) {
+    foreach ($paymentMethods as $paymentMethod) {
       switch ($paymentMethod) {
         case 'sepa_debit':
           if ($propertyBag->getCurrency() === 'EUR') {
@@ -254,8 +255,14 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
           }
           break;
 
-        case 'ach_debit':
+        case 'us_bank_account':
           if ($propertyBag->getCurrency() === 'USD') {
+            $result[] = $paymentMethod;
+          }
+          break;
+
+        case 'bacs_debit':
+          if ($propertyBag->getCurrency() === 'GBP') {
             $result[] = $paymentMethod;
           }
           break;
