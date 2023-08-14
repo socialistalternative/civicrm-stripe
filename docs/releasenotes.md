@@ -9,6 +9,13 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.9.2 (2023-08-14)
+
+* Enable BACS direct debit and send subscribtion data to stripe checkout.
+* When form incorrectly submits a one-off for a recur log an error and return a generic error message (it's a configuration error).
+* Standardize event processor return messages (messages that are displayed in the list of processed payment processor webhooks).
+* More conversion to \Civi\Payment\Propertybag (internal code enhancements).
+
 ## Release 6.9.1 (2023-07-18)
 
 * Fix recording balancetransaction details (eg. available_on) on FinancialTrxn when payment is completed immediately (eg. Contribution page) and add tests to cover this scenario.
