@@ -839,7 +839,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       ->addValue('next_sched_contribution_date', $nextScheduledContributionDate)
       ->addValue('cycle_day', date('d', strtotime($nextScheduledContributionDate)));
 
-    if ($propertyBag->has('installments') && ($propertyBag->getRecurInstallments() > 0)) {
+    if ($propertyBag->has('recurInstallments') && ($propertyBag->getRecurInstallments() > 0)) {
       // We set an end date if installments > 0
       if (empty($params['receive_date'])) {
         $params['receive_date'] = date('YmdHis');
@@ -1146,7 +1146,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @throws \CRM_Core_Exception
    */
   public function calculateEndDate($params) {
-    $requiredParams = ['receive_date', 'installments', 'recurFrequencyInterval', 'recurFrequencyUnit'];
+    $requiredParams = ['receive_date', 'recurInstallments', 'recurFrequencyInterval', 'recurFrequencyUnit'];
     foreach ($requiredParams as $required) {
       if (!isset($params[$required])) {
         $message = $this->getLogPrefix() . 'calculateEndDate: Missing mandatory parameter: ' . $required;
@@ -1173,7 +1173,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         break;
     }
 
-    $numberOfUnits = $params['installments'] * $params['recurFrequencyInterval'];
+    $numberOfUnits = $params['recurInstallments'] * $params['recurFrequencyInterval'];
     $endDate = new DateTime($params['receive_date']);
     $endDate->add(new DateInterval("P{$numberOfUnits}{$frequencyUnit}"));
     return $endDate->format('Ymd') . '235959';
