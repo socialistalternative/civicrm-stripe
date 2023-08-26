@@ -9,6 +9,12 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.9.3 (2023-08-26)
+
+* Partially fix [#367](https://lab.civicrm.org/extensions/stripe/-/issues/367) - "Installments" ignored in recurring contributions -- it just keeps going indefinitely.
+* Stripe.Populatewebhookqueue API: Use standard onReceiveWebhook() function so data is formatted correctly.
+* Fix Stripe.Listevents API with stripe events so you don't get an `array_key_exists()` error.
+
 ## Release 6.9.2 (2023-08-14)
 
 * Enable BACS direct debit and send subscribtion data to stripe checkout.
