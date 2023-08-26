@@ -396,6 +396,7 @@ function civicrm_api3_stripe_Listevents($params) {
       $item['contribution_id'] = NULL;
       $item['contribution_status_id'] = NULL;
       $item['processed'] = 'no';
+      $item['data'] = json_encode($data);
 
       if ($customer) {
         // Check if the customer is in the stripe customer table.

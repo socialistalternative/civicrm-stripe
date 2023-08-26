@@ -259,12 +259,16 @@ class CRM_Core_Payment_StripeIPN {
    * When CiviCRM receives a Stripe webhook call this method (via handlePaymentNotification()).
    * This checks the webhook and either queues or triggers processing (depending on existing webhooks in queue)
    *
+   * Set default to "process immediately". This will get changed to FALSE if we already
+   *   have a pending webhook in the queue or the webhook is flagged for delayed processing.
+   * @param bool $processWebhook
+   *
    * @return bool
    * @throws \CRM_Core_Exception
    * @throws \CiviCRM_API3_Exception
    * @throws \Stripe\Exception\UnknownApiErrorException
    */
-  public function onReceiveWebhook(): bool {
+  public function onReceiveWebhook($processWebhook = TRUE): bool {
     if (!in_array($this->eventType, CRM_Stripe_Webhook::getDefaultEnabledEvents())) {
       // We don't handle this event, return 200 OK so Stripe does not retry.
       return TRUE;
@@ -293,10 +297,6 @@ class CRM_Core_Payment_StripeIPN {
       ->addWhere('identifier', '=', $uniqueIdentifier)
       ->addWhere('processed_date', 'IS NULL')
       ->execute();
-
-    // Set default to "process immediately". This will get changed to FALSE if we already
-    //   have a pending webhook in the queue or the webhook is flagged for delayed processing.
-    $processWebhook = TRUE;
 
     if (empty($paymentProcessorWebhooks->rowCount)) {
       // We have not received this webhook before.
