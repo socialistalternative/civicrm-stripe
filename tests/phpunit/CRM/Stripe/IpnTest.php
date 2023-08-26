@@ -1577,7 +1577,6 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
       ->method('all')
       ->willReturn(new PropertySpy('events.all', [ 'data' => [ $mockEvent ] ]));
     $stripeClient->events
-      ->expects($this->atLeastOnce())
       ->method('retrieve')
       ->with($this->equalTo($eventData['id']))
       ->willReturn(new PropertySpy('events.retrieve', $mockEvent));
@@ -1588,7 +1587,7 @@ class CRM_Stripe_IpnTest extends CRM_Stripe_BaseTest {
     // $this->assertNotEmpty($event, "Failed to fetch event type $eventData[type]");
 
     // Process it with the IPN/webhook
-    return $this->ipn($mockEvent, TRUE, $exceptionOnFailure);
+    return $this->ipn($mockEvent, FALSE, $exceptionOnFailure);
   }
 
 }

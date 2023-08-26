@@ -30,7 +30,7 @@ function _civicrm_api3_stripe_ListEvents_spec(&$spec) {
   $spec['type']['title'] = E::ts('Limit to the given Stripe events type, defaults to invoice.payment_succeeded.');
   $spec['type']['api.default'] = 'invoice.payment_succeeded';
   $spec['limit']['title'] = E::ts('Limit number of results returned (100 is max, 25 default)');
-  $spec['starting_after']['title'] = E::ts('Only return results after this id.');
+  $spec['starting_after']['title'] = E::ts('Only return results after this Stripe event ID.');
   $spec['output']['api.default'] = 'brief';
   $spec['output']['title'] = E::ts('How to format the output, brief or raw. Defaults to brief.');
   $spec['source']['title'] = E::ts('List events via the Stripe API (default: stripe) or via the CiviCRM System Log (systemlog).');
@@ -159,7 +159,8 @@ function civicrm_api3_stripe_ProcessParams($params) {
   }
 
   // Check to see if we should filter by type.
-  if (array_key_exists('type', $params) ) {
+  // If empty we get all events
+  if (!empty($params['type'])) {
     // Validate - since we will be appending this to an URL.
     if (!civicrm_api3_stripe_VerifyEventType($params['type'])) {
       throw new API_Exception("Unrecognized Event Type.", 1236);
@@ -219,23 +220,6 @@ function civicrm_api3_stripe_ProcessParams($params) {
 }
 
 /**
- *
- * Massage system log events
- *
- * This is silly. The stripe library converts everything to an array when they
- * call json_decode, but then seems to somehow rebuild the ['objects'] layer
- * as actual objects. To try to mimic the same results, we don't covert the entire
- * json string to an array, only the data index, leaving the rest as objects.
- */
-function _civicrm_api3_stripe_listevents_massage_systemlog_json($data) {
-  // Decode from json, ensure top layer is an array.
-  $data = (array) json_decode($data);
-  // Also ensure the data layer is an array.
-  $data['data'] = (array) $data['data'];
-  return $data;
-}
-
-/**
  * Stripe.ListEvents API
  *
  * @param array $params
@@ -275,18 +259,18 @@ function civicrm_api3_stripe_Listevents($params) {
     $dao = CRM_Core_DAO::executeQuery($sql, $sql_params);
     $seen_charges = [];
     while($dao->fetch()) {
-      $data = _civicrm_api3_stripe_listevents_massage_systemlog_json($dao->context);
-      if (in_array($data['data']['object']->charge, $seen_charges)) {
+      $data = json_decode($dao->context);
+      if (in_array($data->data->object->charge, $seen_charges)) {
         // We might get more then one event for a single charge if the first attempt fails. We
         // don't need to list them all.
         continue;
       }
-      $seen_charges[] = $data['data']['object']->charge;
-      $data['system_log_id'] = $dao->id;
+      $seen_charges[] = $data->data->object->charge;
+      $data->system_log_id = $dao->id;
 
       // Add this charge to the list to return. Index by timestamp so we can
       // sort them chronologically later.
-      $index = $data['created'];
+      $index = $data->created;
       $data_list['data'][$index] = $data;
     }
 
@@ -329,6 +313,7 @@ function civicrm_api3_stripe_Listevents($params) {
     if ($starting_after) {
       $args['starting_after'] = $starting_after;
     }
+    // Returns an array of \Stripe\Event objects
     $data_list = $processor->stripeClient->events->all($args);
   }
 
@@ -343,13 +328,13 @@ function civicrm_api3_stripe_Listevents($params) {
     $dao = CRM_Core_DAO::executeQuery($sql, $sql_params);
     $seen_charges = [];
     while($dao->fetch()) {
-      $data = _civicrm_api3_stripe_listevents_massage_systemlog_json($dao->context);
-      $charge = $data['data']['object']->charge;
+      $data = json_decode($dao->context);
+      $charge = $data->data->object->charge;
       if ($charge && in_array($charge, $seen_charges)) {
         continue;
       }
       $seen_charges[] = $charge;
-      $data['system_log_id'] = $dao->id;
+      $data->system_log_id = $dao->id;
       $data_list['data'][] = $data;
     }
   }
@@ -367,28 +352,29 @@ function civicrm_api3_stripe_Listevents($params) {
         break;
       }
       $item = [];
-      if (array_key_exists('system_log_id', $data)) {
-        $item['system_log_id'] = $data['system_log_id'];
+
+      if (isset($data->system_log_id)) {
+        $item['system_log_id'] = $data->system_log_id;
       }
-      $item['id'] = $data['id'];
-      $item['created'] = date('Y-m-d H:i:s', $data['created']);
-      $item['livemode'] = $data['livemode'];
-      $item['pending_webhooks'] = $data['pending_webhooks'];
-      $item['type'] = $data['type'];
+      $item['id'] = $data->id;
+      $item['created'] = date('Y-m-d H:i:s', $data->created);
+      $item['livemode'] = $data->livemode;
+      $item['pending_webhooks'] = $data->pending_webhooks;
+      $item['type'] = $data->type;
 
       $invoice = NULL;
       $charge = NULL;
       $customer = NULL;
       $subscription = NULL;
       $total = NULL;
-      if (preg_match('/invoice\.payment_/', $data['type'])) {
-        $invoice = $data['data']['object']->id;
-        $charge = $data['data']['object']->charge;
-        $customer = $data['data']['object']->customer;
-        $subscription = $data['data']['object']->subscription;
-        $total = $data['data']['object']->total;
+      if (preg_match('/invoice\.payment_/', $data->type)) {
+        $invoice = $data->data->object->id;
+        $charge = $data->data->object->charge;
+        $customer = $data->data->object->customer;
+        $subscription = $data->data->object->subscription;
+        $total = $data->data->object->total;
       }
-      elseif($data['object'] == 'invoice') {
+      elseif($data->object == 'invoice') {
         $invoice = $data->id;
         $charge = $data->charge;
         $customer = $data->customer;

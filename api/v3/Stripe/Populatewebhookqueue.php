@@ -28,9 +28,20 @@ use Civi\Api4\PaymentprocessorWebhook;
  * @param array $spec description of fields supported by this API call
  */
 function _civicrm_api3_stripe_Populatewebhookqueue_spec(&$spec) {
-  $spec['ppid']['title'] = E::ts('The id of the payment processor.');
+  $spec['ppid'] = [
+    'type' => CRM_Utils_Type::T_INT,
+    'title' => ts('Payment Processor ID'),
+    'description' => 'Foreign key to civicrm_payment_processor.id',
+    'pseudoconstant' => [
+      'table' => 'civicrm_payment_processor',
+      'keyColumn' => 'id',
+      'labelColumn' => 'title',
+    ],
+    'api.required' => FALSE,
+  ];
   $spec['type']['title'] = E::ts('The event type - defaults to invoice.payment_succeeded.');
   $spec['type']['api.default'] = 'invoice.payment_succeeded';
+  $spec['starting_after']['title'] = E::ts('Only return results after this Stripe event ID.');
 }
 
 /**
@@ -60,6 +71,11 @@ function civicrm_api3_stripe_Populatewebhookqueue($params) {
 
   $listEventsParams['limit'] = 100;
   $listEventsParams['ppid'] = $params['ppid'];
+  $listEventsParams['type'] = $params['type'];
+  if (!empty($params['starting_after'])) {
+    $listEventsParams['starting_after'] = $params['starting_after'];
+  }
+
   $items = [];
   $last_item = NULL;
   while(1) {
