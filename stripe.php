@@ -245,7 +245,13 @@ function stripe_civicrm_post($op, $objectName, $objectId, &$objectRef) {
 
     case 'Email':
       if (in_array($op, ['create', 'edit'])) {
-        register_shutdown_function('stripe_civicrm_shutdown_updatestripecustomer', $objectRef->contact_id);
+        if ($objectRef->N == 0) {
+          // Object may not be loaded; may not have contact_id available yet.
+          $objectRef->find(TRUE);
+        }
+        if ($objectRef->contact_id) {
+          register_shutdown_function('stripe_civicrm_shutdown_updatestripecustomer', $objectRef->contact_id);
+        }
       }
   }
 }
