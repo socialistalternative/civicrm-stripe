@@ -326,6 +326,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
       default:
         // Something else happened, completely unrelated to Stripe
+        \Civi::log('stripe')->error($this->getLogPrefix() . $op . ' (unknown error): ' . get_class($e) . ': ' . $e->getMessage());
         return $genericError;
     }
   }
