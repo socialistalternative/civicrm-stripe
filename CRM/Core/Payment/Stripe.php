@@ -269,7 +269,8 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     // Set plugin info and API credentials.
     Stripe::setAppInfo('CiviCRM', CRM_Utils_System::version(), CRM_Utils_System::baseURL());
     Stripe::setApiKey(self::getSecretKey($this->_paymentProcessor));
-    Stripe::setApiVersion(CRM_Stripe_Check::API_VERSION);
+    // With Stripe-php 12 we pin to latest Stripe API
+    // Stripe::setApiVersion(CRM_Stripe_Check::API_VERSION);
   }
 
   /**
