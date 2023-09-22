@@ -12,6 +12,7 @@
 use Brick\Money\Money;
 use Civi\Api4\ContributionRecur;
 use Civi\Api4\PaymentprocessorWebhook;
+use Civi\Api4\StripeCustomer;
 use CRM_Stripe_ExtensionUtil as E;
 use Civi\Payment\PropertyBag;
 use Stripe\Stripe;
@@ -712,6 +713,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       'contact_id' => $propertyBag->getContactID(),
       'processor_id' => $this->getPaymentProcessor()['id'],
       'email' => $propertyBag->getEmail(),
+      'currency' => mb_strtolower($propertyBag->getCurrency()),
       // Include this to allow redirect within session on payment failure
       'error_url' => $propertyBag->getCustomProperty('error_url'),
     ];
@@ -720,27 +722,54 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     //   1. Look for an existing customer.
     //   2. If no customer (or a deleted customer found), create a new one.
     //   3. If existing customer found, update the metadata that Stripe holds for this customer.
-    $stripeCustomerID = CRM_Stripe_Customer::find($customerParams);
+
+    // Customers can only be billed for subscriptions in a single currency. currency field was added in 6.10
+    // So we look for a customer with matching currency and if not check for an empty currency (if customer was created before 6.10)
+    $stripeCustomer = StripeCustomer::get(FALSE)
+      ->addWhere('contact_id', '=', $customerParams['contact_id'])
+      ->addWhere('processor_id', '=', $customerParams['processor_id'])
+      ->addClause('OR', ['currency', 'IS EMPTY'], ['currency', '=', $customerParams['currency']])
+      ->addOrderBy('currency', 'DESC')
+      ->execute()->first();
+
     // Customer not in civicrm database.  Create a new Customer in Stripe.
-    if (!isset($stripeCustomerID)) {
-      $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
+    if (empty($stripeCustomer)) {
+      $stripeCustomerObject = CRM_Stripe_Customer::create($customerParams, $this);
     }
     else {
+      $shouldDeleteStripeCustomer = $shouldCreateNewStripeCustomer = FALSE;
       // Customer was found in civicrm database, fetch from Stripe.
       try {
-        $stripeCustomer = $this->stripeClient->customers->retrieve($stripeCustomerID);
-        $shouldDeleteStripeCustomer = $stripeCustomer->isDeleted();
+        $stripeCustomerObject = $this->stripeClient->customers->retrieve($stripeCustomer['customer_id']);
+        $shouldDeleteStripeCustomer = $stripeCustomerObject->isDeleted();
       } catch (Exception $e) {
         $err = $this->parseStripeException('retrieve_customer', $e);
         \Civi::log()->error($this->getLogPrefix() . 'Failed to retrieve Stripe Customer: ' . $err['code']);
         $shouldDeleteStripeCustomer = TRUE;
       }
 
+      if (empty($stripeCustomer['currency'])) {
+        // We have no currency set for the customer in the CiviCRM database
+        if ($stripeCustomerObject->currency === $customerParams['currency']) {
+          // We can use this customer but we need to update the currency in the civicrm database
+          StripeCustomer::update(FALSE)
+            ->addValue('currency', $stripeCustomerObject->currency)
+            ->addWhere('id', '=', $stripeCustomer['id'])
+            ->execute();
+        }
+        else {
+          // We need to create a new customer
+          $shouldCreateNewStripeCustomer = TRUE;
+        }
+      }
+
       if ($shouldDeleteStripeCustomer) {
-        // Customer doesn't exist or was deleted, create a new one
+        // Customer was deleted, delete it.
         CRM_Stripe_Customer::delete($customerParams);
+      }
+      if ($shouldDeleteStripeCustomer || $shouldCreateNewStripeCustomer) {
         try {
-          $stripeCustomer = CRM_Stripe_Customer::create($customerParams, $this);
+          $stripeCustomerObject = CRM_Stripe_Customer::create($customerParams, $this);
         } catch (Exception $e) {
           // We still failed to create a customer
           $err = $this->parseStripeException('create_customer', $e);
@@ -748,7 +777,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         }
       }
     }
-    return $stripeCustomer;
+    return $stripeCustomerObject;
   }
 
   /**

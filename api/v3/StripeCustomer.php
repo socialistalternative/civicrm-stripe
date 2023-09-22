@@ -102,7 +102,7 @@ function _civicrm_api3_stripe_customer_create_spec(&$spec) {
  * @throws \Civi\Payment\Exception\PaymentProcessorException
  */
 function civicrm_api3_stripe_customer_create($params) {
-  CRM_Stripe_Customer::add($params);
+  civicrm_api4('StripeCustomer', 'create', ['checkPermissions' => FALSE, 'values' => $params]);
   return civicrm_api3_create_success([]);
 }
 

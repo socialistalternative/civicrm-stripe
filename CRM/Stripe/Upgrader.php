@@ -420,7 +420,7 @@ class CRM_Stripe_Upgrader extends CRM_Extension_Upgrader_Base {
   }
 
   public function upgrade_6803() {
-    $this->ctx->log->info('Applying Stripe update 5028. In civicrm_stripe_customers database table, rename id to customer_id, add new id column');
+    $this->ctx->log->info('In civicrm_stripe_customers database table, rename id to customer_id, add new id column');
     if (!CRM_Core_BAO_SchemaHandler::checkIfFieldExists('civicrm_stripe_customers', 'customer_id')) {
       // ALTER TABLE ... RENAME COLUMN only in MySQL8+
       CRM_Core_DAO::executeQuery("ALTER TABLE civicrm_stripe_customers CHANGE COLUMN id customer_id varchar(255) COMMENT 'Stripe Customer ID'");
@@ -429,6 +429,14 @@ class CRM_Stripe_Upgrader extends CRM_Extension_Upgrader_Base {
         CRM_Core_DAO::executeQuery('CREATE INDEX customer_id ON civicrm_stripe_customers (customer_id)');
       }
       CRM_Core_DAO::executeQuery("ALTER TABLE civicrm_stripe_customers ADD COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Unique ID' FIRST");
+    }
+    return TRUE;
+  }
+
+  public function upgrade_6900() {
+    $this->ctx->log->info('Add currency to civicrm_stripe_customers because the customer can only have one currency for subscriptions');
+    if (!CRM_Core_BAO_SchemaHandler::checkIfFieldExists('civicrm_stripe_customers', 'currency')) {
+      CRM_Core_DAO::executeQuery("ALTER TABLE civicrm_stripe_customers ADD COLUMN currency varchar(3) DEFAULT NULL COMMENT '3 character string, value from Stripe customer.'");
     }
     return TRUE;
   }

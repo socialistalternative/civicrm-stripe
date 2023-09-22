@@ -41,6 +41,7 @@ class CRM_Stripe_Customer {
     $result = StripeCustomer::get(FALSE)
       ->addWhere('contact_id', '=', $params['contact_id'])
       ->addWhere('processor_id', '=', $params['processor_id'])
+      ->addClause('OR', ['currency', 'IS EMPTY'], ['currency', '=', $params['currency']])
       ->addSelect('customer_id')
       ->execute();
 
@@ -81,17 +82,6 @@ class CRM_Stripe_Customer {
   }
 
   /**
-   * Add a new Stripe customer to the CiviCRM database
-   *
-   * @param array $params
-   *
-   * @throws \Civi\Payment\Exception\PaymentProcessorException
-   */
-  public static function add(array $params) {
-    return civicrm_api4('StripeCustomer', 'create', ['checkPermissions' => FALSE, 'values' => $params]);
-  }
-
-  /**
    * @param array $params
    * @param \CRM_Core_Payment_Stripe $stripe
    *
@@ -110,7 +100,7 @@ class CRM_Stripe_Customer {
     $stripeCustomerParams = CRM_Stripe_BAO_StripeCustomer::getStripeCustomerMetadata($params['contact_id'], $params['invoice_settings'] ?? []);
 
     try {
-      $stripeCustomer = $stripe->stripeClient->customers->create($stripeCustomerParams);
+      $stripeCustomerObject = $stripe->stripeClient->customers->create($stripeCustomerParams);
     }
     catch (Exception $e) {
       $err = $stripe->parseStripeException('create_customer', $e);
@@ -119,14 +109,14 @@ class CRM_Stripe_Customer {
     }
 
     // Store the relationship between CiviCRM's email address for the Contact & Stripe's Customer ID.
-    $params = [
-      'contact_id' => $params['contact_id'],
-      'customer_id' => $stripeCustomer->id,
-      'processor_id' => $params['processor_id'],
-    ];
-    self::add($params);
+    StripeCustomer::create(FALSE)
+      ->addValue('contact_id', $params['contact_id'])
+      ->addValue('customer_id', $stripeCustomerObject->id)
+      ->addValue('processor_id', $params['processor_id'])
+      ->addValue('currency', $params['currency'])
+      ->execute();
 
-    return $stripeCustomer;
+    return $stripeCustomerObject;
   }
 
   /**

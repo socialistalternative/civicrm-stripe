@@ -423,7 +423,7 @@ class CRM_Stripe_PaymentIntent {
         }
       }
       catch (Exception $e) {
-        \Civi::log()->debug(get_class($e) . $e->getMessage());
+        \Civi::log('stripe')->debug($this->paymentProcessor->getLogPrefix() . get_class($e) . $e->getMessage());
       }
     }
     else {

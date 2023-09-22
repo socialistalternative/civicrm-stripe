@@ -54,12 +54,15 @@
       <labelColumn>name</labelColumn>
     </pseudoconstant>
   </field>
-  <!-- <foreignKey>
-    <name>processor_id</name>
-    <table>civicrm_payment_processor</table>
-    <key>id</key>
-    <onDelete>SET NULL</onDelete>
-  </foreignKey> -->
+  <field>
+    <name>currency</name>
+    <type>varchar</type>
+    <length>3</length>
+    <default>NULL</default>
+    <headerPattern>/cur(rency)?/i</headerPattern>
+    <dataPattern>/^[A-Z]{3}$/i</dataPattern>
+    <comment>3 character string, value from Stripe customer.</comment>
+  </field>
 
-  
+
 </table>
