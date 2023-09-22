@@ -41,18 +41,7 @@ class CRM_Stripe_PaymentIntent {
   /**
    * @param \CRM_Core_Payment_Stripe $paymentProcessor
    */
-  public function __construct($paymentProcessor = NULL) {
-    if ($paymentProcessor) {
-      $this->setPaymentProcessor($paymentProcessor);
-    }
-  }
-
-  /**
-   * @param \CRM_Core_Payment_Stripe $paymentProcessor
-   *
-   * @return void
-   */
-  public function setPaymentProcessor(\CRM_Core_Payment_Stripe $paymentProcessor) {
+  public function __construct(\CRM_Core_Payment_Stripe $paymentProcessor) {
     $this->paymentProcessor = $paymentProcessor;
   }
 
@@ -354,9 +343,6 @@ class CRM_Stripe_PaymentIntent {
     // This parameter has security implications and great care should be taken when setting it to TRUE.
     $params['moto'] = $params['moto'] ?? FALSE;
 
-    /** @var \CRM_Core_Payment_Stripe $paymentProcessor */
-    $paymentProcessor = \Civi\Payment\System::singleton()->getById($params['paymentProcessorID']);
-    $this->setPaymentProcessor($paymentProcessor);
     if ($this->paymentProcessor->getPaymentProcessor()['class_name'] !== 'Payment_Stripe') {
       \Civi::log('stripe')->error(__CLASS__ . " payment processor {$params['paymentProcessorID']} is not Stripe");
       return (object) ['ok' => FALSE, 'message' => 'Payment processor is not Stripe', 'data' => []];
