@@ -54,103 +54,6 @@ function stripe_civicrm_buildForm($formName, &$form) {
   }
 
   switch ($formName) {
-    /* This is now disabled (6.7) in favour of creating a setupIntent and performing 3DS validation on the same page as the card details.
-    case 'CRM_Contribute_Form_Contribution_ThankYou':
-    case 'CRM_Event_Form_Registration_ThankYou':
-      // This is a fairly nasty way of matching and retrieving our paymentIntent as it is no longer available.
-      $qfKey = CRM_Utils_Request::retrieve('qfKey', 'String');
-      if (!empty($qfKey)) {
-        try {
-          $paymentIntent = civicrm_api3('StripePaymentintent', 'getsingle', [
-            'return' => [
-              'stripe_intent_id',
-              'status',
-              'contribution_id'
-            ],
-            'identifier' => $qfKey
-          ]);
-        }
-        catch (Exception $e) {
-          // If we can't find a paymentIntent assume it was not a Stripe transaction and don't load Stripe vars
-          // This could happen for various reasons (eg. amount = 0).
-          return;
-        }
-      }
-
-      if (empty($paymentIntent['contribution_id'])) {
-        // If we now have a contribution ID try and update it so we can cross-reference the paymentIntent
-        $contributionId = $form->getVar('_values')['contributionId'];
-        if (!empty($contributionId)) {
-          civicrm_api3('StripePaymentintent', 'create', [
-            'id' => $paymentIntent['id'],
-            'contribution_id' => $contributionId
-          ]);
-        }
-      }
-
-      /** @var \CRM_Core_Payment_Stripe $paymentProcessor *//*
-      $paymentProcessor = \Civi\Payment\System::singleton()->getById($form->_paymentProcessor['id']);
-      try {
-        $jsVars = [
-          'id' => $form->_paymentProcessor['id'],
-          'publishableKey' => CRM_Core_Payment_Stripe::getPublicKeyById($form->_paymentProcessor['id']),
-          'locale' => CRM_Stripe_Api::mapCiviCRMLocaleToStripeLocale(),
-          'apiVersion' => CRM_Stripe_Check::API_VERSION,
-          'csrfToken' => class_exists('\Civi\Firewall\Firewall') ? \Civi\Firewall\Firewall::getCSRFToken() : NULL,
-          'country' => CRM_Core_BAO_Country::defaultContactCountry(),
-        ];
-
-        switch (substr($paymentIntent['stripe_intent_id'], 0, 2)) {
-          case 'pi':
-            // pi_ Stripe PaymentIntent
-            $stripePaymentIntent = $paymentProcessor->stripeClient->paymentIntents->retrieve($paymentIntent['stripe_intent_id']);
-            // We need the confirmation_method to decide whether to use handleCardAction (manual) or handleCardPayment (automatic) on the js side
-            $jsVars['paymentIntentID'] = $stripePaymentIntent->id;
-            $jsVars['intentStatus'] = $stripePaymentIntent->status;
-            $jsVars['paymentIntentMethod'] = $stripePaymentIntent->confirmation_method;
-            break;
-
-          case 'se':
-            // seti_ Stripe SetupIntent
-            $stripeSetupIntent = $paymentProcessor->stripeClient->setupIntents->retrieve($paymentIntent['stripe_intent_id']);
-            $jsVars['setupIntentID'] = $stripeSetupIntent->id;
-            $jsVars['setupIntentNextAction'] = $stripeSetupIntent->next_action;
-            $jsVars['setupIntentClientSecret'] = $stripeSetupIntent->client_secret;
-            $jsVars['intentStatus'] = $stripeSetupIntent->status;
-            break;
-
-          default:
-            // For a delayed start_date we only have a paymentMethod (pm_).
-            return;
-        }
-
-        if (in_array($jsVars['intentStatus'], ['succeeded', 'canceled'])) {
-          // If intentStatus == succeeded there is nothing to do so don't load script.
-          // 'canceled' was in the civicrmStripeConfirm.js - not sure why! But including here for now.
-          return;
-        }
-        \Civi::resources()->addVars(E::SHORT_NAME, $jsVars);
-      }
-      catch (Exception $e) {
-        // Do nothing, we won't attempt further stripe processing
-      }
-
-      \Civi::resources()->addScriptUrl(
-        \Civi::service('asset_builder')->getUrl(
-          'civicrmStripeConfirm.js',
-          [
-            'path' => \Civi::resources()->getPath(E::LONG_NAME, 'js/civicrmStripeConfirm.js'),
-            'mimetype' => 'application/javascript',
-          ]
-        ),
-        // Load after any other scripts
-        100,
-        'page-footer'
-      );
-
-      break;
-      */
-
     case 'CRM_Admin_Form_PaymentProcessor':
       $paymentProcessor = $form->getVar('_paymentProcessorDAO');
       if ($paymentProcessor && $paymentProcessor->class_name === 'Payment_Stripe') {
@@ -197,17 +100,6 @@ function stripe_civicrm_navigationMenu(&$menu) {
  */
 function stripe_civicrm_alterLogTables(&$logTableSpec) {
   unset($logTableSpec['civicrm_stripe_paymentintent']);
-}
-
-/**
- * @param string $entity
- * @param string $action
- * @param array $params
- * @param array $permissions
- */
-function stripe_civicrm_alterAPIPermissions($entity, $action, &$params, &$permissions) {
-  $permissions['stripe_paymentintent']['process'] = ['make online contributions'];
-  $permissions['stripe_paymentintent']['createorupdate'] = ['make online contributions'];
 }
 
 /**
