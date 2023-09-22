@@ -9,6 +9,14 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.9.4 (2023-09-22)
+**Stripe API version 2023-08-16 is NOT supported.
+The last supported API version for 6.9.x is 2022-11-15 See [#446](https://lab.civicrm.org/extensions/stripe/-/issues/446)**
+
+* Remove exception that causes loading of contribution pages to fail with 'Check Stripe credentials' if live does not have credentials but test does.
+* [!230](https://lab.civicrm.org/extensions/stripe/-/merge_requests/230) Fix issue in stripe_civicrm_post where a not-yet loaded contact_id, causes crash.
+* [!231](https://lab.civicrm.org/extensions/stripe/-/merge_requests/231) parseStripeException: log unrelated errors.
+
 ## Release 6.9.3 (2023-08-26)
 
 * Partially fix [#367](https://lab.civicrm.org/extensions/stripe/-/issues/367) - "Installments" ignored in recurring contributions -- it just keeps going indefinitely.
