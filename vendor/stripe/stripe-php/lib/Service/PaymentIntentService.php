@@ -40,17 +40,17 @@ class PaymentIntentService extends \Stripe\Service\AbstractService
     /**
      * A PaymentIntent object can be canceled when it is in one of these statuses:
      * <code>requires_payment_method</code>, <code>requires_capture</code>,
-     * <code>requires_confirmation</code>, <code>requires_action</code>, or
-     * <code>processing</code>.
+     * <code>requires_confirmation</code>, <code>requires_action</code> or, <a
+     * href="/docs/payments/intents">in rare cases</a>, <code>processing</code>.
      *
      * Once canceled, no additional charges will be made by the PaymentIntent and any
      * operations on the PaymentIntent will fail with an error. For PaymentIntents with
-     * <code>status=’requires_capture’</code>, the remaining
+     * a <code>status</code> of <code>requires_capture</code>, the remaining
      * <code>amount_capturable</code> will automatically be refunded.
      *
      * You cannot cancel the PaymentIntent for a Checkout Session. <a
      * href="/docs/api/checkout/sessions/expire">Expire the Checkout Session</a>
-     * instead
+     * instead.
      *
      * @param string $id
      * @param null|array $params
@@ -94,8 +94,9 @@ class PaymentIntentService extends \Stripe\Service\AbstractService
      * If the selected payment method requires additional authentication steps, the
      * PaymentIntent will transition to the <code>requires_action</code> status and
      * suggest additional actions via <code>next_action</code>. If payment fails, the
-     * PaymentIntent will transition to the <code>requires_payment_method</code>
-     * status. If payment succeeds, the PaymentIntent will transition to the
+     * PaymentIntent transitions to the <code>requires_payment_method</code> status or
+     * the <code>canceled</code> status if the confirmation limit is reached. If
+     * payment succeeds, the PaymentIntent will transition to the
      * <code>succeeded</code> status (or <code>requires_capture</code>, if
      * <code>capture_method</code> is set to <code>manual</code>). If the
      * <code>confirmation_method</code> is <code>automatic</code>, payment may be
@@ -195,12 +196,12 @@ class PaymentIntentService extends \Stripe\Service\AbstractService
     /**
      * Retrieves the details of a PaymentIntent that has previously been created.
      *
-     * Client-side retrieval using a publishable key is allowed when the
-     * <code>client_secret</code> is provided in the query string.
+     * You can retrieve a PaymentIntent client-side using a publishable key when the
+     * <code>client_secret</code> is in the query string.
      *
-     * When retrieved with a publishable key, only a subset of properties will be
-     * returned. Please refer to the <a href="#payment_intent_object">payment
-     * intent</a> object reference for more details.
+     * If you retrieve a PaymentIntent with a publishable key, it only returns a subset
+     * of properties. Refer to the <a href="#payment_intent_object">payment intent</a>
+     * object reference for more details.
      *
      * @param string $id
      * @param null|array $params
@@ -238,10 +239,10 @@ class PaymentIntentService extends \Stripe\Service\AbstractService
     /**
      * Updates properties on a PaymentIntent object without confirming.
      *
-     * Depending on which properties you update, you may need to confirm the
-     * PaymentIntent again. For example, updating the <code>payment_method</code> will
-     * always require you to confirm the PaymentIntent again. If you prefer to update
-     * and confirm at the same time, we recommend updating properties via the <a
+     * Depending on which properties you update, you might need to confirm the
+     * PaymentIntent again. For example, updating the <code>payment_method</code>
+     * always requires you to confirm the PaymentIntent again. If you prefer to update
+     * and confirm at the same time, we recommend updating properties through the <a
      * href="/docs/api/payment_intents/confirm">confirm API</a> instead.
      *
      * @param string $id

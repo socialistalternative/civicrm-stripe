@@ -9,6 +9,7 @@ namespace Stripe\Service;
  *
  * @property AccountLinkService $accountLinks
  * @property AccountService $accounts
+ * @property AccountSessionService $accountSessions
  * @property ApplePayDomainService $applePayDomains
  * @property ApplicationFeeService $applicationFees
  * @property Apps\AppsServiceFactory $apps
@@ -34,9 +35,10 @@ namespace Stripe\Service;
  * @property Issuing\IssuingServiceFactory $issuing
  * @property MandateService $mandates
  * @property OAuthService $oauth
- * @property OrderService $orders
  * @property PaymentIntentService $paymentIntents
  * @property PaymentLinkService $paymentLinks
+ * @property PaymentMethodConfigurationService $paymentMethodConfigurations
+ * @property PaymentMethodDomainService $paymentMethodDomains
  * @property PaymentMethodService $paymentMethods
  * @property PayoutService $payouts
  * @property PlanService $plans
@@ -52,11 +54,11 @@ namespace Stripe\Service;
  * @property SetupIntentService $setupIntents
  * @property ShippingRateService $shippingRates
  * @property Sigma\SigmaServiceFactory $sigma
- * @property SkuService $skus
  * @property SourceService $sources
  * @property SubscriptionItemService $subscriptionItems
  * @property SubscriptionService $subscriptions
  * @property SubscriptionScheduleService $subscriptionSchedules
+ * @property Tax\TaxServiceFactory $tax
  * @property TaxCodeService $taxCodes
  * @property TaxRateService $taxRates
  * @property Terminal\TerminalServiceFactory $terminal
@@ -75,6 +77,7 @@ class CoreServiceFactory extends \Stripe\Service\AbstractServiceFactory
     private static $classMap = [
         'accountLinks' => AccountLinkService::class,
         'accounts' => AccountService::class,
+        'accountSessions' => AccountSessionService::class,
         'applePayDomains' => ApplePayDomainService::class,
         'applicationFees' => ApplicationFeeService::class,
         'apps' => Apps\AppsServiceFactory::class,
@@ -100,9 +103,10 @@ class CoreServiceFactory extends \Stripe\Service\AbstractServiceFactory
         'issuing' => Issuing\IssuingServiceFactory::class,
         'mandates' => MandateService::class,
         'oauth' => OAuthService::class,
-        'orders' => OrderService::class,
         'paymentIntents' => PaymentIntentService::class,
         'paymentLinks' => PaymentLinkService::class,
+        'paymentMethodConfigurations' => PaymentMethodConfigurationService::class,
+        'paymentMethodDomains' => PaymentMethodDomainService::class,
         'paymentMethods' => PaymentMethodService::class,
         'payouts' => PayoutService::class,
         'plans' => PlanService::class,
@@ -118,11 +122,11 @@ class CoreServiceFactory extends \Stripe\Service\AbstractServiceFactory
         'setupIntents' => SetupIntentService::class,
         'shippingRates' => ShippingRateService::class,
         'sigma' => Sigma\SigmaServiceFactory::class,
-        'skus' => SkuService::class,
         'sources' => SourceService::class,
         'subscriptionItems' => SubscriptionItemService::class,
         'subscriptions' => SubscriptionService::class,
         'subscriptionSchedules' => SubscriptionScheduleService::class,
+        'tax' => Tax\TaxServiceFactory::class,
         'taxCodes' => TaxCodeService::class,
         'taxRates' => TaxRateService::class,
         'terminal' => Terminal\TerminalServiceFactory::class,

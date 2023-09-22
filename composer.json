@@ -2,6 +2,6 @@
     "name": "civicrm/stripe",
     "description": "Stripe Payment Processor",
     "require": {
-        "stripe/stripe-php": "^9"
+        "stripe/stripe-php": "^12"
     }
 }
