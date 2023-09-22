@@ -107,7 +107,7 @@ class ProcessPublic extends \Civi\Api4\Generic\AbstractAction {
     }
 
     if (empty($this->amount) && !$this->setup) {
-      \Civi::log('stripe')->error(__CLASS__ . 'missing amount and not capture or setup');
+      \Civi::log('stripe')->error(__CLASS__ . 'missing amount and not setup');
       throw new \CRM_Core_Exception('Bad request');
     }
 

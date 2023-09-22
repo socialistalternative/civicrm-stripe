@@ -335,8 +335,6 @@ class CRM_Stripe_PaymentIntent {
    */
   public function processIntent(array $params) {
     // Params that may or may not be set by calling code:
-    // 'capture' was used by civicrmStripeConfirm.js and was removed when we added setupIntents.
-    $params['capture'] = $params['capture'] ?? FALSE;
     // 'currency' should really be set but we'll default if not set.
     $currency = \CRM_Utils_Type::validate($params['currency'], 'String', \CRM_Core_Config::singleton()->defaultCurrency);
     // If a payment using MOTO (mail order telephone order) was requested.
@@ -359,7 +357,7 @@ class CRM_Stripe_PaymentIntent {
       $processPaymentIntentParams = [
         'paymentIntentID' => $params['intentID'],
         'paymentMethodID' => $params['paymentMethodID'],
-        'capture' => $params['capture'],
+        'capture' => FALSE,
         'amount' => $params['amount'],
         'currency' => $currency,
         'payment_method_options' => $params['payment_method_options'] ?? [],
@@ -427,9 +425,6 @@ class CRM_Stripe_PaymentIntent {
         $intent = $this->paymentProcessor->stripeClient->paymentIntents->retrieve($params['paymentIntentID']);
         if ($intent->status === 'requires_confirmation') {
           $intent->confirm();
-        }
-        if ($params['capture'] && $intent->status === 'requires_capture') {
-          $intent->capture();
         }
       }
       catch (Exception $e) {
