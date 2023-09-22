@@ -61,9 +61,6 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $this->setAPIParams();
         $this->stripeClient = new \Stripe\StripeClient($secretKey);
       }
-      else {
-        throw new PaymentProcessorException('Check the configured Stripe credentials');
-      }
     }
   }
 
