@@ -16,10 +16,10 @@
     <email>mjw@mjwconsult.co.uk</email>
   </maintainer>
   <releaseDate>2023-09-22</releaseDate>
-  <version>6.9.4</version>
+  <version>6.10-dev</version>
   <develStage>stable</develStage>
   <compatibility>
-    <ver>5.58</ver>
+    <ver>5.64</ver>
   </compatibility>
   <comments>Original Author: Joshua Walker (drastik) - Drastik by Design.
     Jamie Mcclelland (ProgressiveTech) did a lot of the 5.x compatibility work.
