@@ -183,6 +183,10 @@
                 script.successHandler('setupIntentID', cardActionResult.setupIntent.id);
               }
             }
+            // WordPress returns a 200 not 500 HTTP response because headers are sent beforehand.  So we check for an error code in the response.
+            else if (paymentIntentProcessResponse.hasOwnProperty('error_code')) {
+              script.stripePaymentIntentProcessFail(paymentIntentProcessResponse);
+            }
             else {
               // All good, we can submit the form
               script.successHandler('paymentMethodID', createPaymentMethodResult.paymentMethod.id);
@@ -241,6 +245,10 @@
                 // server
                 script.successHandler('paymentIntentID', cardActionResult.paymentIntent.id);
               }
+            }
+            // WordPress returns a 200 not 500 HTTP response because headers are sent beforehand.  So we check for an error code in the response.
+            else if (paymentIntentProcessResponse.hasOwnProperty('error_code')) {
+              script.stripePaymentIntentProcessFail(paymentIntentProcessResponse);
             }
             else {
               // All good, we can submit the form
