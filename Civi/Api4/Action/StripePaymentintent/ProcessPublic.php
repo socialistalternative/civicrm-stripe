@@ -150,7 +150,7 @@ class ProcessPublic extends \Civi\Api4\Generic\AbstractAction {
       $result->exchangeArray($processIntentResult->data);
     }
     else {
-      throw new \CRM_Core_Exception($processIntentResult->message);
+      throw new \CRM_Core_Exception($processIntentResult->message, 0, ['show_detailed_error' => TRUE]);
     }
   }
 
