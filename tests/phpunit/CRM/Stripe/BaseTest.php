@@ -402,9 +402,20 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
         'description' => NULL,
         'csrfToken' => $firewall->generateCSRFToken(),
       ];
-      $result = civicrm_api3('StripePaymentintent', 'process', $paymentIntentParams);
+      $result = \Civi\Api4\StripePaymentintent::processPublic(TRUE)
+        ->setPaymentMethodID($paymentMethod->id)
+        ->setAmount($this->total)
+        ->setPaymentProcessorID($this->paymentProcessorID)
+        ->setIntentID($params['paymentIntentID'] ?? NULL)
+        ->setDescription(NULL)
+        ->setCsrfToken($firewall->generateCSRFToken())
+        ->execute();
+      // $result = civicrm_api3('StripePaymentintent', 'process', $paymentIntentParams);
 
-      $paymentIntentID = $result['values']['paymentIntent']['id'];
+      if (empty($result['success'])) {
+        throw new CRM_Core_Exception('StripePaymentintent::processPublic did not return success');
+      }
+      $paymentIntentID = $result['paymentIntent']['id'];
     }
     else {
       $paymentMethodID = $paymentMethod->id;
