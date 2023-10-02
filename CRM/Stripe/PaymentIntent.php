@@ -413,6 +413,8 @@ class CRM_Stripe_PaymentIntent {
 
     $intentParams = [];
     $intentParams['confirm'] = TRUE;
+    $intentParams['confirmation_method'] = 'manual';
+    $intentParams['payment_method_types'] = ['card'];
 
     if (!empty($params['paymentIntentID'])) {
       try {
@@ -445,9 +447,6 @@ class CRM_Stripe_PaymentIntent {
         if (isset($params['customer'])) {
           $intentParams['customer'] = $params['customer'];
         }
-
-        $intentParams['automatic_payment_methods']['enabled'] = TRUE;
-        $intentParams['automatic_payment_methods']['allow_redirects'] = 'never';
 
         $intent = $this->paymentProcessor->stripeClient->paymentIntents->create($intentParams);
       }
