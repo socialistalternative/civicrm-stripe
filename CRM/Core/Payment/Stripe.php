@@ -837,12 +837,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     }
 
     // Create the stripe plan
-    $planId = self::createPlan($propertyBag, $amountFormattedForStripe);
+    $plan = self::createPlan($propertyBag, $amountFormattedForStripe);
 
     // Attach the Subscription to the Stripe Customer.
     $subscriptionParams = [
       'proration_behavior' => 'none',
-      'plan' => $planId,
+      'plan' => $plan->id,
       'metadata' => ['Description' => $propertyBag->getDescription()],
       'expand' => ['latest_invoice.payment_intent'],
       'customer' => $stripeCustomer->id,
