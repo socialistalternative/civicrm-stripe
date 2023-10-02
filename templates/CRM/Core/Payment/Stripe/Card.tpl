@@ -25,7 +25,6 @@
 {crmScope extensionKey='com.drastikbydesign.stripe'}
   <div id="crm-payment-js-billing-form-container" class="stripe">
     <div id="card-element" style="display: none"></div>
-    <div id="paymentrequest-element" style="display: none"></div>
     {* Area for Stripe to report errors *}
     <div id="card-errors" role="alert" class="crm-error alert alert-danger"></div>
   </div>
