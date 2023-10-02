@@ -303,7 +303,7 @@ class CRM_Core_Payment_StripeIPN {
         }
       }
       if (!$eventForThisPaymentProcessor) {
-        echo "Event ({$this->getEventID()}) is not for this payment processor so ignoring silently.received successfully by CiviCRM: {$name} {$test}.";
+        echo "Event ({$this->getEventID()}) is not for this payment processor - ignoring. CiviCRM: {$name} {$test}.";
         exit();
       }
     }
