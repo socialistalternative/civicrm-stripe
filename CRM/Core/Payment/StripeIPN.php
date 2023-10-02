@@ -221,6 +221,7 @@ class CRM_Core_Payment_StripeIPN {
 
     $this->charge_id = $this->retrieve('charge_id', 'String', FALSE);
     $this->payment_intent_id = $this->retrieve('payment_intent_id', 'String', FALSE);
+    $this->customer_id = $this->retrieve('customer_id', 'String', FALSE);
 
     $this->setInputParametersHasRun = TRUE;
   }
@@ -274,11 +275,10 @@ class CRM_Core_Payment_StripeIPN {
       return TRUE;
     }
 
-    // Now re-retrieve the data from Stripe to ensure it's legit.
+    $test = $this->getPaymentProcessor()->getPaymentProcessor()['is_test'] ? '(Test)' : '(Live)';
+    $name = $this->getPaymentProcessor()->getPaymentProcessor()['name'];
     // Special case if this is the test webhook
     if (substr($this->getEventID(), -15, 15) === '_00000000000000') {
-      $test = (boolean) $this->getPaymentProcessor()->getPaymentProcessor()['is_test'] ? '(Test)' : '(Live)';
-      $name = $this->getPaymentProcessor()->getPaymentProcessor()['name'];
       echo "Test webhook from Stripe ({$this->getEventID()}) received successfully by CiviCRM: {$name} {$test}.";
       exit();
     }
@@ -286,6 +286,29 @@ class CRM_Core_Payment_StripeIPN {
     // Check, decode, validate webhook data and extract some parameters to the class
     $this->setInputParameters();
 
+    // If we have both Stripe (elements) and Stripe Checkout setup it is quite likely that
+    //   we have two payment processors with the same private/public key and we'll receive "duplicate" webhooks.
+    // So if we have a Stripe Customer ID with the event check that it matches our payment processor ID as recorded
+    //   in the civicrm_stripe_customers table.
+    if (!empty($this->getStripeCustomerID())) {
+      $stripeCustomers = \Civi\Api4\StripeCustomer::get(FALSE)
+        ->addWhere('customer_id', '=', $this->getStripeCustomerID())
+        ->execute();
+      $eventForThisPaymentProcessor = FALSE;
+      foreach ($stripeCustomers as $stripeCustomer) {
+        if ($stripeCustomer['processor_id'] === $this->getPaymentProcessor()->getID()) {
+          // We have a customer in the database for this processor - continue processing
+          $eventForThisPaymentProcessor = TRUE;
+          break;
+        }
+      }
+      if (!$eventForThisPaymentProcessor) {
+        echo "Event ({$this->getEventID()}) is not for this payment processor so ignoring silently.received successfully by CiviCRM: {$name} {$test}.";
+        exit();
+      }
+    }
+
+    // Get a "unique" identifier for this webhook that allows us to match "duplicate/similar" webhooks.
     $uniqueIdentifier = $this->getWebhookUniqueIdentifier();
 
     // Get all received webhooks with matching identifier which have not been processed

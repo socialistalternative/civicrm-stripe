@@ -177,20 +177,23 @@ class CRM_Stripe_Api {
 
       case 'checkout.session':
         switch ($name) {
-          case 'payment_intent_id':
-            return (string) $stripeObject->payment_intent;
-
           case 'checkout_session_id':
             return (string) $stripeObject->id;
 
           case 'client_reference_id':
             return (string) $stripeObject->client_reference_id;
 
-          case 'subscription_id':
-            return (string) $stripeObject->subscription;
+          case 'customer_id':
+            return (string) $stripeObject->customer;
 
           case 'invoice_id':
             return (string) $stripeObject->invoice;
+
+          case 'payment_intent_id':
+            return (string) $stripeObject->payment_intent;
+
+          case 'subscription_id':
+            return (string) $stripeObject->subscription;
         }
         break;
 
