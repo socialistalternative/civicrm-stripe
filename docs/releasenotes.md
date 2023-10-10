@@ -9,7 +9,7 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
-## Release 6.10 (not yet released)
+## Release 6.10 (2023-10-10)
 **Supports Stripe API version 2023-08-16 (and will force it to be used).**
 
 ### Breaking changes
