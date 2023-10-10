@@ -606,10 +606,6 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     $amountFormattedForStripe = $this->getAmountFormattedForStripeAPI($propertyBag);
 
-    // @fixme: Check if we still need to call the getBillingEmail function - eg. how does it handle "email-Primary".
-    $email = $this->getBillingEmail($propertyBag, $propertyBag->getContactID());
-    $propertyBag->setEmail($email);
-
     $stripeCustomer = $this->getStripeCustomer($propertyBag);
 
     $customerParams = [
@@ -708,6 +704,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @throws \Civi\Payment\Exception\PaymentProcessorException
    */
   protected function getStripeCustomer(\Civi\Payment\PropertyBag $propertyBag) {
+    if (!$propertyBag->has('email')) {
+      // @fixme: Check if we still need to call the getBillingEmail function - eg. how does it handle "email-Primary".
+      $email = $this->getBillingEmail($propertyBag);
+      $propertyBag->setEmail($email);
+    }
+
     // See if we already have a stripe customer
     $customerParams = [
       'contact_id' => $propertyBag->getContactID(),
