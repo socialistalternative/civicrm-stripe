@@ -11,20 +11,18 @@
 namespace Civi\Api4;
 
 /**
- * CiviCRM settings api.
+ * CiviCRM StripeCharge API
  *
- * Used to read/write persistent setting data from CiviCRM.
+ * Used to get info about Stripe Charges
  *
- * @see \Civi\Core\SettingsBag
  * @searchable none
- * @since 5.19
  * @package Civi\Api4
  */
 class StripeCharge extends Generic\AbstractEntity {
 
   /**
    * @param bool $checkPermissions
-   * @return Action\Setting\Get
+   * @return Action\StripeCharge\GetBalanceTransactionDetails
    */
   public static function getBalanceTransactionDetails($checkPermissions = TRUE) {
     return (new Action\StripeCharge\GetBalanceTransactionDetails(__CLASS__, __FUNCTION__))
