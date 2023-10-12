@@ -91,13 +91,13 @@ class CRM_Stripe_Api {
             return (string) $stripeObject->subscription;
 
           case 'amount':
-            return (string) $stripeObject->amount_due / 100;
+            return (float) $stripeObject->amount_due / 100;
 
           case 'amount_paid':
-            return (string) $stripeObject->amount_paid / 100;
+            return (float) $stripeObject->amount_paid / 100;
 
           case 'amount_remaining':
-            return (string) $stripeObject->amount_remaining / 100;
+            return (float) $stripeObject->amount_remaining / 100;
 
           case 'currency':
             return self::formatCurrency($stripeObject->currency);
@@ -133,7 +133,7 @@ class CRM_Stripe_Api {
             return (string) $stripeObject->plan->interval;
 
           case 'plan_amount':
-            return (string) $stripeObject->plan->amount / 100;
+            return (float) $stripeObject->plan->amount / 100;
 
           case 'currency':
             return self::formatCurrency($stripeObject->plan->currency);
