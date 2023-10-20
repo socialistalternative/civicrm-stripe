@@ -43,7 +43,7 @@ class Api {
    * @throws \Stripe\Exception\ApiErrorException
    */
   public function getDetailsFromBalanceTransaction(string $chargeID, $stripeObject = NULL): array {
-    if ($stripeObject && ($stripeObject['object'] !== 'charge') && (!empty($chargeID))) {
+    if ($stripeObject && ($stripeObject->object !== 'charge') && (!empty($chargeID))) {
       $charge = $this->getPaymentProcessor()->stripeClient->charges->retrieve($chargeID);
       $balanceTransactionID = $this->getValueFromStripeObject('balance_transaction', 'String', $charge);
     }

@@ -287,7 +287,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'charge') {
+    if (($this->getData()->object->object ?? '') !== 'charge') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -407,7 +407,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'charge') {
+    if (($this->getData()->object->object ?? '') !== 'charge') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -504,7 +504,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'charge') {
+    if (($this->getData()->object->object ?? '') !== 'charge') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -558,7 +558,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'checkout.session') {
+    if (($this->getData()->object->object ?? '') !== 'checkout.session') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -659,7 +659,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+    if (($this->getData()->object->object ?? '') !== 'invoice') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -775,7 +775,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+    if (($this->getData()->object->object?? '') !== 'invoice') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -835,7 +835,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'invoice') {
+    if (($this->getData()->object->object?? '') !== 'invoice') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -895,7 +895,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'subscription') {
+    if (($this->getData()->object->object ?? '') !== 'subscription') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
@@ -938,7 +938,7 @@ class Events {
     $return = $this->getResultObject();
 
     // Check we have the right data object for this event
-    if (($this->getData()->object['object'] ?? '') !== 'subscription') {
+    if (($this->getData()->object->object ?? '') !== 'subscription') {
       $return->message = $this->formatResultMessage(__FUNCTION__, 'Invalid object type');
       return $return;
     }
