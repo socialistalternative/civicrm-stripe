@@ -217,6 +217,41 @@ class CRM_Stripe_Api {
         }
         break;
 
+      case 'subscription_item':
+        switch ($name) {
+          default:
+            if (isset($stripeObject->$name)) {
+              return $stripeObject->$name;
+            }
+            \Civi::log()->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
+            return NULL;
+          // unit_amount
+        }
+        break;
+
+      case 'price':
+        switch ($name) {
+          case 'unit_amount':
+            return (float) $stripeObject->unit_amount / 100;
+
+          case 'recurring_interval':
+            // eg. "year"
+            return (string) $stripeObject->recurring->interval ?? '';
+
+          case 'recurring_interval_count':
+            // eg 1
+            return (int) $stripeObject->recurring->interval_count ?? 0;
+
+          default:
+            if (isset($stripeObject->$name)) {
+              return $stripeObject->$name;
+            }
+            \Civi::log()->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
+            return NULL;
+          // unit_amount
+        }
+        break;
+
     }
 
     return NULL;

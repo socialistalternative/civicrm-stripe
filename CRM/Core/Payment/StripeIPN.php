@@ -387,9 +387,8 @@ class CRM_Core_Payment_StripeIPN {
     if (!$this->setEventType($webhookEvent['trigger'])) {
       // We don't handle this event
       return FALSE;
-    };
-    // @todo consider storing webhook data when received.
-    $this->setVerifyData(TRUE);
+    }
+
     $this->setExceptionMode(FALSE);
     if (isset($emailReceipt)) {
       $this->setSendEmailReceipt($emailReceipt);

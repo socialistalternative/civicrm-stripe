@@ -11,6 +11,7 @@
  */
 
 namespace Civi\Stripe\Webhook;
+use Brick\Money\Money;
 use Civi\Api4\Contribution;
 use Civi\Api4\ContributionRecur;
 use CRM_Stripe_ExtensionUtil as E;
@@ -943,7 +944,93 @@ class Events {
       return $return;
     }
 
-    $return->message = $this->formatResultMessage(__FUNCTION__, 'ignoring - not implemented');
+    $subscriptionID = $this->api->getValueFromStripeObject('subscription_id', 'String', $this->getData()->object);
+
+    $contributionRecur = $this->getRecurFromSubscriptionID($subscriptionID);
+    if (empty($contributionRecur)) {
+      // Subscription was not found in CiviCRM
+      $result = [];
+      \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'subscription_not_found', $result);
+      if (empty($result['contributionRecur'])) {
+        $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No contributionRecur record found in CiviCRM. Ignored'));
+        $return->ok = TRUE;
+        return $return;
+      }
+      $contributionRecur = $result['contributionRecur'];
+    }
+
+    if (!isset($this->getData()->previous_attributes)) {
+      // Nothing changed?!
+      $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('No changes. Ignored'));
+      $return->ok = TRUE;
+      return $return;
+    }
+
+    // First work out what changed. This is held in "previous_attributes" on webhook data
+    $previousAttributes = $this->getData()->previous_attributes;
+    // Simple check that we actually have some items data
+    // Otherwise it could just be a metadata change which we are not interested in.
+    $amountHasChanged = FALSE;
+    if (!empty($previousAttributes->items->data)) {
+      $amountHasChanged = TRUE;
+    }
+
+    if ($amountHasChanged) {
+      $objectData = $this->getData()->object;
+      $calculatedItems = [];
+      // Recalculate amount and update
+      foreach ($objectData->items->data as $item) {
+        $subscriptionItem['subscriptionItemID'] = $this->api->getValueFromStripeObject('id', 'String', $item);
+        $subscriptionItem['quantity'] = $this->api->getValueFromStripeObject('quantity', 'Int', $item);
+        $subscriptionItem['unit_amount'] = $this->api->getValueFromStripeObject('unit_amount', 'Float', $item->price);
+
+        $calculatedItem['currency'] = $this->api->getValueFromStripeObject('currency', 'String', $item->price);
+        $calculatedItem['amount'] = $subscriptionItem['unit_amount'] * $subscriptionItem['quantity'];
+        if ($this->api->getValueFromStripeObject('type', 'String', $item->price) === 'recurring') {
+          $calculatedItem['frequency_unit'] = $this->api->getValueFromStripeObject('recurring_interval', 'String', $item->price);
+          $calculatedItem['frequency_interval'] = $this->api->getValueFromStripeObject('recurring_interval_count', 'Int', $item->price);
+        }
+
+        if (empty($calculatedItem['frequency_unit'])) {
+          \Civi::log()->warning("StripeIPN: {$objectData->id} customer.subscription.updated:
+            Non recurring subscription items are not supported");
+        }
+        else {
+          $intervalKey = $calculatedItem['currency'] . '_' . $calculatedItem['frequency_unit'] . '_' . $calculatedItem['frequency_interval'];
+          if (isset($calculatedItems[$intervalKey])) {
+            // If we have more than one subscription item with the same currency and frequency add up the amounts and combine.
+            $calculatedItem['amount'] += ($calculatedItems[$intervalKey]['amount'] ?? 0);
+            $calculatedItem['subscriptionItem'] = $calculatedItems[$intervalKey]['subscriptionItem'];
+          }
+          $calculatedItem['subscriptionItem'][] = $subscriptionItem;
+          $calculatedItems[$intervalKey] = $calculatedItem;
+        }
+      }
+    }
+
+    // $calculatedItems now contains array of new prices by key [currency]_[frequency_unit]_[frequency_interval]
+    // Eg. $calculatedItems[usd_month_1] = [
+    //       'currency' => 'usd',
+    //       'amount' => '2000', (amount is in pence)
+    //     ];
+
+    // Now check if recurring contribution matches frequency
+
+    $contributionRecurKey = mb_strtolower($contributionRecur['currency']) . "_{$contributionRecur['frequency_unit']}_{$contributionRecur['frequency_interval']}";
+    if (isset($calculatedItems[$contributionRecurKey])) {
+      $calculatedItem = $calculatedItems[$contributionRecurKey];
+      $templateContribution = \CRM_Contribute_BAO_ContributionRecur::getTemplateContribution($contributionRecur['id']);
+      if (!Money::of($calculatedItem['amount'], mb_strtoupper($calculatedItem['currency']))
+        ->isAmountAndCurrencyEqualTo(Money::of($templateContribution['total_amount'], $templateContribution['currency']))) {
+        // Create a new template contribution to update the amount
+        \Civi\Api4\ContributionRecur::updateAmountOnRecurMJW(FALSE)
+          ->addWhere('id', '=', $contributionRecur['id'])
+          ->addValue('amount', $calculatedItem['amount'])
+          ->execute();
+        $return->message = $this->formatResultMessage(__FUNCTION__, 'recur: ' . $contributionRecur['id'] . '; new amount: ' . $calculatedItem['amount'] . ' currency: ' . $calculatedItem['currency']);
+      }
+    }
+
     $return->ok = TRUE;
     return $return;
   }
