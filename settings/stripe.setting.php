@@ -231,4 +231,21 @@ Do NOT enable unless you\'ve enabled this feature on your Stripe account - see <
       ],
     ],
   ],
+  'stripe_cardelement_disablelink' => [
+    'name' => 'stripe_cardelement_disablelink',
+    'type' => 'Boolean',
+    'html_type' => 'checkbox',
+    'default' => 0,
+    'is_domain' => 1,
+    'is_contact' => 0,
+    'title' => E::ts('Disable Stripe "Link" in Card element'),
+    'description' => E::ts('Stripe might add a "Link button" (https://stripe.com/payments/link) which can be controlled via the dashboard. This setting allows you to force it to disabled.'),
+    'html_attributes' => [],
+    'settings_pages' => [
+      'stripe' => [
+        'weight' => 10,
+      ]
+    ],
+  ],
+
 ];

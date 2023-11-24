@@ -477,6 +477,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       'csrfToken' => NULL,
       'country' => \Civi::settings()->get('stripe_country'),
       'moto' => \Civi::settings()->get('stripe_moto') && ($form->isBackOffice ?? FALSE) && CRM_Core_Permission::check('allow stripe moto payments'),
+      'disablelink' => \Civi::settings()->get('stripe_cardelement_disablelink'),
     ];
     if (class_exists('\Civi\Firewall\Firewall')) {
       $firewall = new \Civi\Firewall\Firewall();

@@ -639,6 +639,11 @@
         elementsCreateParams.value.postalCode = postCode;
       }
 
+      // disableLink - https://lab.civicrm.org/extensions/stripe/-/issues/458
+      if (CRM.vars[script.name].disablelink) {
+        elementsCreateParams.disableLink = true;
+      }
+
       // Cleanup any classes leftover from previous switching payment processors
       script.getJQueryPaymentElements().card.removeClass();
       // Create an instance of the card Element.
