@@ -137,7 +137,7 @@ class CRM_Stripe_Customer {
       throw new PaymentProcessorException('Stripe Customer (delete): Missing required parameter: contact_id or customer_id');
     }
 
-    $delete = StripeCustomer::delete()
+    $delete = StripeCustomer::delete(FALSE)
       ->addWhere('processor_id', '=', $params['processor_id']);
 
     if (!empty($params['customer_id'])) {
