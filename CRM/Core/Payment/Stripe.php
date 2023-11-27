@@ -466,6 +466,11 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       $context = \Civi\Formprotection\Forms::getContextFromQuickform($form);
     }
 
+    $motoEnabled = CRM_Core_Permission::check('allow stripe moto payments')
+      && (
+        (in_array('backend', \Civi::settings()->get('stripe_moto')) && $form->isBackOffice)
+        || (in_array('frontend', \Civi::settings()->get('stripe_moto')) && !$form->isBackOffice)
+      );
     $jsVars = [
       'id' => $form->_paymentProcessor['id'],
       'currency' => $this->getDefaultCurrencyForForm($form),
@@ -476,7 +481,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       'apiVersion' => CRM_Stripe_Check::API_VERSION,
       'csrfToken' => NULL,
       'country' => \Civi::settings()->get('stripe_country'),
-      'moto' => \Civi::settings()->get('stripe_moto') && ($form->isBackOffice ?? FALSE) && CRM_Core_Permission::check('allow stripe moto payments'),
+      'moto' => $motoEnabled,
       'disablelink' => \Civi::settings()->get('stripe_cardelement_disablelink'),
     ];
     if (class_exists('\Civi\Firewall\Firewall')) {

@@ -19,7 +19,6 @@ It is supported for all payment types.
 If you want to take payments in this way you have to:
 
 1. Request that it is enabled on your Stripe account.
-2. Enable "MOTO payments" in CiviCRM Stripe settings.
+2. Enable "MOTO payments" in CiviCRM Stripe settings (and choose if you want it enabled on backoffice and/or frontend forms).
 3. Give the "CiviCRM Stripe: Process MOTO transactions" permission to roles which are allowed to process MOTO payments (eg. administrator).
 
-It will only be available on backend forms.
