@@ -24,6 +24,7 @@ class CRM_Stripe_Api {
     // object is a string containing the Stripe object name
     switch ($stripeObject->object) {
       case 'charge':
+        /** @var \Stripe\Charge $stripeObject */
         switch ($name) {
           case 'charge_id':
             return (string) $stripeObject->id;
@@ -77,6 +78,7 @@ class CRM_Stripe_Api {
         break;
 
       case 'invoice':
+        /** @var \Stripe\Invoice $stripeObject */
         switch ($name) {
           case 'charge_id':
             return (string) $stripeObject->charge;
@@ -125,18 +127,38 @@ class CRM_Stripe_Api {
         break;
 
       case 'subscription':
+        /** @var \Stripe\Subscription $stripeObject */
         switch ($name) {
           case 'frequency_interval':
-            return (string) $stripeObject->plan->interval_count;
-
           case 'frequency_unit':
-            return (string) $stripeObject->plan->interval;
+          case 'amount':
+            $plan = [
+              'amount' => 0,
+              'interval' => '',
+              'interval_count' => 0,
+            ];
+            foreach ($stripeObject->items as $item) {
+              if ($item->price->active && ($item->quantity > 0)) {
+                $plan['amount'] += $item->price->unit_amount * $item->quantity;
+                $plan['interval'] = $item->plan->interval;
+                $plan['interval_count'] = $item->plan->interval_count;
+              }
+            }
 
-          case 'plan_amount':
-            return (float) $stripeObject->plan->amount / 100;
+            switch($name) {
+              case 'frequency_interval':
+                return (int) $plan['interval_count'];
+
+              case 'frequency_unit':
+                return (string) $plan['interval'];
+
+              case 'amount':
+                return (float) $plan['amount'] / 100;
+            }
+            break;
 
           case 'currency':
-            return self::formatCurrency($stripeObject->plan->currency);
+            return self::formatCurrency($stripeObject->currency);
 
           case 'plan_start':
             return self::formatDate($stripeObject->start_date);
@@ -176,6 +198,7 @@ class CRM_Stripe_Api {
         break;
 
       case 'checkout.session':
+        /** @var \Stripe\Checkout\Session $stripeObject */
         switch ($name) {
           case 'checkout_session_id':
             return (string) $stripeObject->id;
