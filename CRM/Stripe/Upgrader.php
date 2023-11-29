@@ -441,10 +441,13 @@ class CRM_Stripe_Upgrader extends CRM_Extension_Upgrader_Base {
     return TRUE;
   }
 
-  public function upgrade_6901() {
+  public function upgrade_6902() {
     $this->ctx->log->info('Convert MOTO setting to array');
     if (\Civi::settings()->get('stripe_moto') === TRUE) {
       \Civi::settings()->set('stripe_moto', ['backend']);
+    }
+    else {
+      \Civi::settings()->set('stripe_moto', []);
     }
     return TRUE;
   }

@@ -9,6 +9,10 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.10.2 (2023-11-29)
+
+**This is the same as 6.10.1 but with a fix for upgrader issues (https://lab.civicrm.org/extensions/stripe/-/issues/460).**
+
 ## Release 6.10.1 (2023-11-29)
 
 * [!238](https://lab.civicrm.org/extensions/stripe/-/merge_requests/238) Add support for enabling payments on frontend forms (via setting)
