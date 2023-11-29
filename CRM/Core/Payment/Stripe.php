@@ -752,7 +752,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $shouldDeleteStripeCustomer = $stripeCustomerObject->isDeleted();
       } catch (Exception $e) {
         $err = $this->parseStripeException('retrieve_customer', $e);
-        \Civi::log()->error($this->getLogPrefix() . 'Failed to retrieve Stripe Customer: ' . $err['code']);
+        \Civi::log('stripe')->error($this->getLogPrefix() . 'Failed to retrieve Stripe Customer: ' . $err['code']);
         $shouldDeleteStripeCustomer = TRUE;
       }
 
@@ -893,7 +893,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     if ($stripeSubscription->status === 'incomplete') {
       // For example with test card 4000000000000341 (Attaching this card to a Customer object succeeds, but attempts to charge the customer fail)
-      \Civi::log()->warning($this->getLogPrefix() . 'subscription status=incomplete. ID:' . $stripeSubscription->id);
+      \Civi::log('stripe')->warning($this->getLogPrefix() . 'subscription status=incomplete. ID:' . $stripeSubscription->id);
       throw new PaymentProcessorException('Payment failed');
     }
 
@@ -1304,7 +1304,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     if (!$propertyBag->has('recurProcessorID')) {
       $errorMessage = E::ts('The recurring contribution cannot be cancelled (No reference (trxn_id) found).');
-      \Civi::log()->error($errorMessage);
+      \Civi::log('stripe')->error($errorMessage);
       throw new PaymentProcessorException($errorMessage);
     }
 
@@ -1316,7 +1316,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     }
     catch (Exception $e) {
       $errorMessage = E::ts('Could not delete Stripe subscription: %1', [1 => $e->getMessage()]);
-      \Civi::log()->error($errorMessage);
+      \Civi::log('stripe')->error($errorMessage);
       throw new PaymentProcessorException($errorMessage);
     }
 
@@ -1352,12 +1352,12 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         $ipnClass->setData($data);
       } catch (\UnexpectedValueException $e) {
         // Invalid payload
-        \Civi::log()->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
+        \Civi::log('stripe')->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
         http_response_code(400);
         exit();
       } catch (\Stripe\Exception\SignatureVerificationException $e) {
         // Invalid signature
-        \Civi::log()->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
+        \Civi::log('stripe')->error($this->getLogPrefix() . 'webhook signature validation error: ' . $e->getMessage());
         http_response_code(400);
         exit();
       }

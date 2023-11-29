@@ -488,7 +488,7 @@ class CRM_Core_Payment_StripeIPN {
           $return->message = $e->getMessage() . "\n" . $e->getTraceAsString();
         }
         $return->exception = $e;
-        \Civi::log()->error("StripeIPN: processWebhookEvent failed. EventID: {$this->eventID} : " . $return->message);
+        \Civi::log('stripe')->error("StripeIPN: processWebhookEvent failed. EventID: {$this->eventID} : " . $return->message);
       }
     }
 

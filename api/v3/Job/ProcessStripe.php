@@ -68,7 +68,7 @@ function civicrm_api3_job_process_stripe($params) {
             $cancelledIDs[] = $incompletePaymentintent['id'];
           }
         }
-        \Civi::log()->error("Stripe.process_stripe: Unable to cancel paymentIntentID: {$incompletePaymentintent['id']}: " . $e->getMessage());
+        \Civi::log('stripe')->error("Stripe.process_stripe: Unable to cancel paymentIntentID: {$incompletePaymentintent['id']}: " . $e->getMessage());
       }
     }
     if (!empty($cancelledIDs)) {

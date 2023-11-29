@@ -218,18 +218,20 @@ class CRM_Stripe_Api {
         break;
 
       case 'subscription_item':
+        /** @var \Stripe\SubscriptionItem $stripeObject */
         switch ($name) {
           default:
             if (isset($stripeObject->$name)) {
               return $stripeObject->$name;
             }
-            \Civi::log()->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
+            \Civi::log('stripe')->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
             return NULL;
           // unit_amount
         }
         break;
 
       case 'price':
+        /** @var \Stripe\Price $stripeObject */
         switch ($name) {
           case 'unit_amount':
             return (float) $stripeObject->unit_amount / 100;
@@ -246,7 +248,7 @@ class CRM_Stripe_Api {
             if (isset($stripeObject->$name)) {
               return $stripeObject->$name;
             }
-            \Civi::log()->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
+            \Civi::log('stripe')->error('getObjectParam: Tried to get param "' . $name . '" from "' . $stripeObject->object . '" but it is not set');
             return NULL;
           // unit_amount
         }

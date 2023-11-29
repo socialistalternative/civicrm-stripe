@@ -126,7 +126,7 @@ function stripe_civicrm_post($op, $objectName, $objectId, &$objectRef) {
             CRM_Stripe_BAO_StripeCustomer::updateMetadataForContact($objectId);
           }
           catch (Exception $e) {
-            \Civi::log(E::SHORT_NAME)->error('Stripe Contact Merge failed: ' . $e->getMessage());
+            \Civi::log('stripe')->error('Stripe Contact Merge failed: ' . $e->getMessage());
           }
           break;
 
@@ -175,7 +175,7 @@ function stripe_civicrm_shutdown_updatestripecustomer(int $contactID) {
     }
   }
   catch (Exception $e) {
-    \Civi::log(E::SHORT_NAME)->error('Stripe Contact update failed: ' . $e->getMessage());
+    \Civi::log('stripe')->error('Stripe Contact update failed: ' . $e->getMessage());
   }
 
 }

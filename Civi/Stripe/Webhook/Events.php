@@ -136,7 +136,7 @@ class Events {
     if (empty($contributionApi3['count'])) {
       if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
         $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . 'No matching contributions for event ' . $this->getEventID();
-        \Civi::log()->debug($message);
+        \Civi::log('stripe')->debug($message);
       }
       $result = [];
       \CRM_Mjwshared_Hook::webhookEventNotMatched('stripe', $this, 'contribution_not_found', $result);
@@ -208,7 +208,7 @@ class Events {
     if (empty($contributionRecur)) {
       if ((bool)\Civi::settings()->get('stripe_ipndebug')) {
         $message = $this->getPaymentProcessor()->getPaymentProcessorLabel() . ': ' . $this->getEventID() . ': Cannot find recurring contribution for subscription ID: ' . $subscriptionID;
-        \Civi::log()->debug($message);
+        \Civi::log('stripe')->debug($message);
       }
       return [];
     }
@@ -474,7 +474,7 @@ class Events {
 
     $lock = \Civi::lockManager()->acquire('data.contribute.contribution.' . $refundParams['contribution_id']);
     if (!$lock->isAcquired()) {
-      \Civi::log()->error('Could not acquire lock to record refund for contribution: ' . $refundParams['contribution_id']);
+      \Civi::log('stripe')->error('Could not acquire lock to record refund for contribution: ' . $refundParams['contribution_id']);
     }
     $refundPayment = civicrm_api3('Payment', 'get', [
       'trxn_id' => $refundParams['trxn_id'],
@@ -684,7 +684,7 @@ class Events {
     // Acquire the lock to find/create contribution
     $lock = \Civi::lockManager()->acquire('data.contribute.contribution.' . $invoiceID);
     if (!$lock->isAcquired()) {
-      \Civi::log()->error('Could not acquire lock to record ' . $this->getEventType() . ' for Stripe InvoiceID: ' . $invoiceID);
+      \Civi::log('stripe')->error('Could not acquire lock to record ' . $this->getEventType() . ' for Stripe InvoiceID: ' . $invoiceID);
     }
 
     // We *normally/ideally* expect to be able to find the contribution,
@@ -718,7 +718,7 @@ class Events {
     // Now acquire lock to record payment on the contribution
     $lock = \Civi::lockManager()->acquire('data.contribute.contribution.' . $contribution['id']);
     if (!$lock->isAcquired()) {
-      \Civi::log()->error('Could not acquire lock to record ' . $this->getEventType() . ' for contribution: ' . $contribution['id']);
+      \Civi::log('stripe')->error('Could not acquire lock to record ' . $this->getEventType() . ' for contribution: ' . $contribution['id']);
     }
 
     // By this point we should have a contribution
@@ -992,7 +992,7 @@ class Events {
         }
 
         if (empty($calculatedItem['frequency_unit'])) {
-          \Civi::log()->warning("StripeIPN: {$objectData->id} customer.subscription.updated:
+          \Civi::log('stripe')->warning("StripeIPN: {$objectData->id} customer.subscription.updated:
             Non recurring subscription items are not supported");
         }
         else {
