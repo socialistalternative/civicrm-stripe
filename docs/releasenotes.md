@@ -9,6 +9,17 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.10.1 (2023-11-29)
+
+* [!238](https://lab.civicrm.org/extensions/stripe/-/merge_requests/238) Add support for enabling payments on frontend forms (via setting)
+* [!236](https://lab.civicrm.org/extensions/stripe/-/merge_requests/236) Add option to disable link on card element (via setting).
+* [!237](https://lab.civicrm.org/extensions/stripe/-/merge_requests/237) Fix Unauthorized API exception causing Failed to retrieve Stripe Customer.
+* [!234](https://lab.civicrm.org/extensions/stripe/-/merge_requests/234) Fix improper use of array in StripeIPN.
+* Cleanup managed custom fields.
+* Fix money types.
+* Fix retrieval of subscription params with newer Stripe API versions.
+* Update importSubscription tests.
+
 ## Release 6.10 (2023-10-10)
 **Supports Stripe API version 2023-08-16 (and will force it to be used).**
 

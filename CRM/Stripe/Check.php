@@ -20,13 +20,13 @@ class CRM_Stripe_Check {
    * @var string
    */
   const API_VERSION = \Stripe\Util\ApiVersion::CURRENT;
-  const API_MIN_VERSION = '2022-11-15';
+  const API_MIN_VERSION = \Stripe\Util\ApiVersion::CURRENT;
 
   /**
    * @var string
    */
-  const MIN_VERSION_MJWSHARED = '1.2.14';
-  const MIN_VERSION_FIREWALL = '1.5.8';
+  const MIN_VERSION_MJWSHARED = '1.2.17';
+  const MIN_VERSION_FIREWALL = '1.5.9';
 
   /**
    * @var array
