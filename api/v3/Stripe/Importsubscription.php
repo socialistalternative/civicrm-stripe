@@ -63,7 +63,7 @@ function civicrm_api3_stripe_importsubscription($params) {
   if (empty($contributionRecur)) {
     $contributionRecurParams = [
       'contact_id' => $params['contact_id'],
-      'amount' => CRM_Stripe_Api::getObjectParam('plan_amount', $stripeSubscription),
+      'amount' => CRM_Stripe_Api::getObjectParam('amount', $stripeSubscription),
       'currency' => CRM_Stripe_Api::getObjectParam('currency', $stripeSubscription),
       'frequency_unit' => CRM_Stripe_Api::getObjectParam('frequency_unit', $stripeSubscription),
       'frequency_interval' => CRM_Stripe_Api::getObjectParam('frequency_interval', $stripeSubscription),

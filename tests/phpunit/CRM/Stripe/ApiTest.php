@@ -204,6 +204,40 @@ class CRM_Stripe_ApiTest extends CRM_Stripe_BaseTest {
       ->method('retrieve')
       ->willReturn($mockPlan);
 
+    $mockPrice = $this->createMock('Stripe\\Price');
+    $mockPrice
+      ->method('__get')
+      ->will($this->returnValueMap([
+        ['unit_amount', $this->total * 100],
+      ]));
+
+    $mockSubscriptionItem = $this->createMock('Stripe\\SubscriptionItem');
+    $mockSubscriptionItem
+      ->method('__get')
+      ->will($this->returnValueMap([
+        ['plan', $mockPlan],
+        ['price', $mockPrice],
+        ['quantity', 1],
+      ]));
+
+    $mockSubscriptionItem = Stripe\SubscriptionItem::constructFrom([
+      'plan' => Stripe\Plan::constructFrom([
+        'id' => 'every-1-month-' . ($this->total * 100) . '-usd-test',
+        'amount' => $this->total*100,
+        'currency' => 'usd',
+        'interval_count' => $this->contributionRecur['frequency_interval'],
+        'interval' => $this->contributionRecur['frequency_unit'],
+      ]),
+      'price' => Stripe\Price::constructFrom([
+          'unit_amount' => $this->total * 100,
+          'active' => TRUE,
+        ]),
+      'quantity' => 1,
+    ]);
+
+    $mockSubscriptionItemsCollection = new \Stripe\Collection();
+    $mockSubscriptionItemsCollection->data = [$mockSubscriptionItem];
+
     $mockSubscriptionParams = [
       'id' => 'sub_mock',
       'object' => 'subscription',
@@ -212,6 +246,8 @@ class CRM_Stripe_ApiTest extends CRM_Stripe_BaseTest {
       'pending_setup_intent' => '',
       'plan' => $mockPlan,
       'start_date' => time(),
+      'currency' => 'usd',
+      'items' => $mockSubscriptionItemsCollection,
     ];
     if ($subscriptionParams['hasPaidInvoice']) {
       // Need a mock intent with id and status
