@@ -330,4 +330,24 @@ class CRM_Stripe_Api {
     ];
   }
 
+  /**
+   * Map the Stripe Subscription Status to the CiviCRM ContributionRecur status.
+   *
+   * @param string $subscriptionStatus
+   *
+   * @return string
+   */
+  public static function mapSubscriptionStatusToRecurStatus(string $subscriptionStatus): string {
+    $statusMap = [
+      'incomplete' => 'Failed',
+      'incomplete_expired' => 'Failed',
+      'trialing' => 'In Progress',
+      'active' => 'In Progress',
+      'past_due' => 'Overdue',
+      'canceled' => 'Cancelled',
+      'unpaid' => 'Failed',
+    ];
+    return $statusMap[$subscriptionStatus] ?? '';
+  }
+
 }
