@@ -1049,6 +1049,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    *
    * @return array
    * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Brick\Money\Exception\UnknownCurrencyException
    */
   public function doRefund(&$params) {
     $requiredParams = ['trxn_id', 'amount'];
@@ -1303,7 +1304,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     }
 
     if (!$propertyBag->has('recurProcessorID')) {
-      $errorMessage = E::ts('The recurring contribution cannot be cancelled (No reference (trxn_id) found).');
+      $errorMessage = E::ts('The recurring contribution cannot be cancelled (No reference (processor_id) found).');
       \Civi::log('stripe')->error($errorMessage);
       throw new PaymentProcessorException($errorMessage);
     }
@@ -1315,7 +1316,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
       }
     }
     catch (Exception $e) {
-      $errorMessage = E::ts('Could not delete Stripe subscription: %1', [1 => $e->getMessage()]);
+      $errorMessage = E::ts('Could not cancel Stripe subscription: %1', [1 => $e->getMessage()]);
       \Civi::log('stripe')->error($errorMessage);
       throw new PaymentProcessorException($errorMessage);
     }

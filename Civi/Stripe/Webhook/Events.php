@@ -729,6 +729,7 @@ class Events {
       // Payment already recorded
       $return->ok = TRUE;
       $return->message = $this->formatResultMessage(__FUNCTION__, E::ts('Payment already recorded'), ['coid' => $contribution['id']]);
+      $lock->release();
       return $return;
     }
 
