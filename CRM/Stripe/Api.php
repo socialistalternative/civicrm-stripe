@@ -104,14 +104,6 @@ class CRM_Stripe_Api {
           case 'currency':
             return self::formatCurrency($stripeObject->currency);
 
-          case 'status_id':
-            if ((bool) $stripeObject->paid) {
-              return 'Completed';
-            }
-            else {
-              return 'Pending';
-            }
-
           case 'description':
             return (string) $stripeObject->description;
 
@@ -122,6 +114,9 @@ class CRM_Stripe_Api {
             // This is a coding error, but it looks like the general policy here is to return something. Could otherwise consider throwing an exception.
             Civi::log()->error("Coding error: CRM_Stripe_Api::getObjectParam failure_message is not a property on a Stripe Invoice object. Please alter your code to fetch the Charge and obtain the failure_message from that.");
             return '';
+
+          case 'status':
+            return self::mapInvoiceStatusToContributionStatus($stripeObject->status);
 
         }
         break;
@@ -189,8 +184,10 @@ class CRM_Stripe_Api {
               case \Stripe\Subscription::STATUS_INCOMPLETE_EXPIRED:
               default:
                 return CRM_Core_PseudoConstant::getKey('CRM_Contribute_BAO_Contribution', 'contribution_status_id', 'Cancelled');
-
             }
+
+          case 'status':
+            return self::mapSubscriptionStatusToRecurStatus($stripeObject->status);
 
           case 'customer_id':
             return (string) $stripeObject->customer;
@@ -348,6 +345,25 @@ class CRM_Stripe_Api {
       'unpaid' => 'Failed',
     ];
     return $statusMap[$subscriptionStatus] ?? '';
+  }
+
+  /**
+   * Map the Stripe Invoice Status to the CiviCRM Contribution status.
+   * https://stripe.com/docs/invoicing/overview#invoice-statuses
+   *
+   * @param string $invoiceStatus
+   *
+   * @return string
+   */
+  public static function mapInvoiceStatusToContributionStatus(string $invoiceStatus): string {
+    $statusMap = [
+      'draft' => 'Pending',
+      'open' => 'Pending',
+      'paid' => 'Completed',
+      'void' => 'Cancelled',
+      'uncollectible' => 'Failed',
+    ];
+    return $statusMap[$invoiceStatus] ?? '';
   }
 
 }
