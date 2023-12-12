@@ -17,6 +17,10 @@ class Api {
 
   use \CRM_Core_Payment_MJWIPNTrait;
 
+  public function __construct($paymentProcessor) {
+    $this->_paymentProcessor = $paymentProcessor;
+  }
+
   /**
    * @param string $name The key of the required value
    * @param string $dataType The datatype of the required value (eg. String)
@@ -74,6 +78,49 @@ class Api {
         'fee_amount' => 0.0
       ];
     }
+  }
+
+  /**
+   * @param string $subscriptionID
+   * @param array $itemsData
+   *   Array of \Stripe\SubscriptionItem
+   *
+   * @return array
+   * @throws \CRM_Core_Exception
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   * @throws \Stripe\Exception\ApiErrorException
+   */
+  public function calculateItemsForSubscription(string $subscriptionID, array $itemsData) {
+    $calculatedItems = [];
+    // Recalculate amount and update
+    foreach ($itemsData as $item) {
+      $subscriptionItem['subscriptionItemID'] = $this->getValueFromStripeObject('id', 'String', $item);
+      $subscriptionItem['quantity'] = $this->getValueFromStripeObject('quantity', 'Int', $item);
+      $subscriptionItem['unit_amount'] = $this->getValueFromStripeObject('unit_amount', 'Float', $item->price);
+
+      $calculatedItem['currency'] = $this->getValueFromStripeObject('currency', 'String', $item->price);
+      $calculatedItem['amount'] = $subscriptionItem['unit_amount'] * $subscriptionItem['quantity'];
+      if ($this->getValueFromStripeObject('type', 'String', $item->price) === 'recurring') {
+        $calculatedItem['frequency_unit'] = $this->getValueFromStripeObject('recurring_interval', 'String', $item->price);
+        $calculatedItem['frequency_interval'] = $this->getValueFromStripeObject('recurring_interval_count', 'Int', $item->price);
+      }
+
+      if (empty($calculatedItem['frequency_unit'])) {
+        \Civi::log('stripe')->warning("StripeIPN: {$subscriptionID} customer.subscription.updated:
+            Non recurring subscription items are not supported");
+      }
+      else {
+        $intervalKey = $calculatedItem['currency'] . '_' . $calculatedItem['frequency_unit'] . '_' . $calculatedItem['frequency_interval'];
+        if (isset($calculatedItems[$intervalKey])) {
+          // If we have more than one subscription item with the same currency and frequency add up the amounts and combine.
+          $calculatedItem['amount'] += ($calculatedItems[$intervalKey]['amount'] ?? 0);
+          $calculatedItem['subscriptionItem'] = $calculatedItems[$intervalKey]['subscriptionItem'];
+        }
+        $calculatedItem['subscriptionItem'][] = $subscriptionItem;
+        $calculatedItems[$intervalKey] = $calculatedItem;
+      }
+    }
+    return $calculatedItems;
   }
 
 }

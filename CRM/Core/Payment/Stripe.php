@@ -33,6 +33,11 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
   public $stripeClient;
 
   /**
+   * @var \Civi\Stripe\Api;
+   */
+  public \Civi\Stripe\Api $api;
+
+  /**
    * Custom properties used by this payment processor
    *
    * @var string[]
@@ -48,6 +53,7 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    */
   public function __construct($mode, $paymentProcessor) {
     $this->_paymentProcessor = $paymentProcessor;
+    $this->api = new \Civi\Stripe\Api($this);
 
     if (defined('STRIPE_PHPUNIT_TEST') && isset($GLOBALS['mockStripeClient'])) {
       // When under test, prefer the mock.
@@ -173,6 +179,10 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     return TRUE;
   }
 
+  public function supportsRecurring() {
+    return TRUE;
+  }
+
   /**
    * We can edit stripe recurring contributions
    * @return bool
@@ -181,8 +191,36 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
     return TRUE;
   }
 
-  public function supportsRecurring() {
-    return TRUE;
+  /**
+   * Get an array of the fields that can be edited on the recurring contribution.
+   *
+   * Some payment processors support editing the amount and other scheduling details of recurring payments, especially
+   * those which use tokens. Others are fixed. This function allows the processor to return an array of the fields that
+   * can be updated from the contribution recur edit screen.
+   *
+   * The fields are likely to be a subset of these
+   *  - 'amount',
+   *  - 'installments',
+   *  - 'frequency_interval',
+   *  - 'frequency_unit',
+   *  - 'cycle_day',
+   *  - 'next_sched_contribution_date',
+   *  - 'end_date',
+   * - 'failure_retry_day',
+   *
+   * The form does not restrict which fields from the contribution_recur table can be added (although if the html_type
+   * metadata is not defined in the xml for the field it will cause an error.
+   *
+   * Open question - would it make sense to return membership_id in this - which is sometimes editable and is on that
+   * form (UpdateSubscription).
+   *
+   * @return array
+   */
+  public function getEditableRecurringScheduleFields() {
+    if ($this->supports('changeSubscriptionAmount')) {
+      return ['amount'];
+    }
+    return [];
   }
 
   /**
@@ -1325,6 +1363,94 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
   }
 
   /**
+   * Change the amount of the recurring payment.
+   *
+   * @param string $message
+   * @param array $params
+   *
+   * @return bool|object
+   *
+   * @throws \Civi\Payment\Exception\PaymentProcessorException
+   */
+  public function changeSubscriptionAmount(&$message = '', $params = []) {
+    // We only support the following params: amount
+    try {
+      $propertyBag = $this->beginChangeSubscriptionAmount($params);
+
+      // Get the Stripe subscription
+      $subscription = $this->stripeClient->subscriptions->retrieve($propertyBag->getRecurProcessorID());
+
+      $calculatedItems = $this->api->calculateItemsForSubscription($propertyBag->getRecurProcessorID(), $subscription->items->data);
+      $contributionRecurKey = mb_strtolower($propertyBag->getCurrency()) . "_{$propertyBag->getRecurFrequencyUnit()}_{$propertyBag->getRecurFrequencyInterval()}";
+      if (isset($calculatedItems[$contributionRecurKey])) {
+        $calculatedItem = $calculatedItems[$contributionRecurKey];
+        if (Money::of($calculatedItem['amount'], mb_strtoupper($calculatedItem['currency']))
+          ->isAmountAndCurrencyEqualTo(Money::of($propertyBag->getAmount(), $propertyBag->getCurrency()))) {
+          throw new PaymentProcessorException('Amount is the same as before!');
+        }
+      }
+      else {
+        throw new PaymentProcessorException('Cannot find existing price/plan for this subscription with matching frequency!');
+      }
+
+      // Get the existing Price
+      $existingPrice = $subscription->items->data[0]->price;
+
+      // Check if the Stripe Product already has a Price configured for the new amount
+      $priceToMatch = [
+        'active' => TRUE,
+        'currency' => $subscription->currency,
+        'product' => $existingPrice->product,
+        'type' => 'recurring',
+        'recurring' => [
+          'interval' => $existingPrice->recurring['interval'],
+        ],
+      ];
+      $existingPrices = $this->stripeClient->prices->all($priceToMatch);
+      foreach ($existingPrices as $price) {
+        if ($price->unit_amount === (int) $this->getAmountFormattedForStripeAPI($propertyBag)) {
+          // Yes, we already have a matching price option - use it!
+          $newPriceID = $price->id;
+          break;
+        }
+      }
+      if (empty($newPriceID)) {
+        // We didn't find an existing price that matched for the product. Create a new one.
+        $newPriceParameters = [
+          'currency' => $subscription->currency,
+          'unit_amount' => $this->getAmountFormattedForStripeAPI($propertyBag),
+          'product' => $existingPrice->product,
+          'metadata' => $existingPrice->metadata->toArray(),
+          'recurring' => [
+            'interval' => $existingPrice->recurring['interval'],
+            'interval_count' => $existingPrice->recurring['interval_count'],
+          ],
+        ];
+        $newPriceID = $this->stripeClient->prices->create($newPriceParameters)->id;
+      }
+
+      // Update the Stripe subscription, replacing the existing price with the new one.
+      $this->stripeClient->subscriptions->update($propertyBag->getRecurProcessorID(), [
+        'items' => [
+          [
+            'id' => $subscription->items->data[0]->id,
+            'price' => $newPriceID,
+          ],
+        ],
+        // See https://stripe.com/docs/billing/subscriptions/prorations - we disable this to keep it simple for now.
+        'proration_behavior' => 'none',
+      ]);
+    }
+    catch (Exception $e) {
+      // On ANY failure, throw an exception which will be reported back to the user.
+      \Civi::log()->error('Update Subscription failed for RecurID: ' . $propertyBag->getContributionRecurID() . ' Error: ' . $e->getMessage());
+      throw new PaymentProcessorException('Update Subscription Failed: ' . $e->getMessage(), $e->getCode(), $params);
+    }
+
+    return TRUE;
+  }
+
+  /**
    * Process incoming payment notification (IPN).
    *
    * @throws \CRM_Core_Exception
@@ -1494,6 +1620,17 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
         }
     }
     return $text;
+  }
+
+  /**
+   * Get the help text to present on the recurring update page.
+   *
+   * This should reflect what can or cannot be edited.
+   *
+   * @return string
+   */
+  public function getRecurringScheduleUpdateHelpText() {
+    return E::ts('Use this form to change the amount for this recurring contribution. The Stripe subscription will be updated with the new amount.');
   }
 
   /*

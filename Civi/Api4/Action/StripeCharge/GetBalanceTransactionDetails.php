@@ -47,8 +47,7 @@ class GetBalanceTransactionDetails extends \Civi\Api4\Generic\AbstractAction {
       throw new \CRM_Core_Exception('Missing paymentProcessorID');
     }
 
-    $stripeApi = new \Civi\Stripe\Api();
-    $stripeApi->setPaymentProcessor($this->paymentProcessorID);
+    $stripeApi = new \Civi\Stripe\Api(\Civi\Payment\System::singleton()->getById($this->paymentProcessorID));
 
     $charge = $stripeApi->getPaymentProcessor()->stripeClient->charges->retrieve($this->chargeID);
 

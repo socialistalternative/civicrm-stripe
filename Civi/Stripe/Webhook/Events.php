@@ -32,8 +32,7 @@ class Events {
 
   public function __construct(int $paymentProcessorID) {
     $this->setPaymentProcessor($paymentProcessorID);
-    $this->api = new \Civi\Stripe\Api();
-    $this->api->setPaymentProcessor($paymentProcessorID);
+    $this->api = new \Civi\Stripe\Api($this->paymentProcessor);
   }
 
   /**
@@ -978,35 +977,7 @@ class Events {
 
     if ($amountHasChanged) {
       $objectData = $this->getData()->object;
-      $calculatedItems = [];
-      // Recalculate amount and update
-      foreach ($objectData->items->data as $item) {
-        $subscriptionItem['subscriptionItemID'] = $this->api->getValueFromStripeObject('id', 'String', $item);
-        $subscriptionItem['quantity'] = $this->api->getValueFromStripeObject('quantity', 'Int', $item);
-        $subscriptionItem['unit_amount'] = $this->api->getValueFromStripeObject('unit_amount', 'Float', $item->price);
-
-        $calculatedItem['currency'] = $this->api->getValueFromStripeObject('currency', 'String', $item->price);
-        $calculatedItem['amount'] = $subscriptionItem['unit_amount'] * $subscriptionItem['quantity'];
-        if ($this->api->getValueFromStripeObject('type', 'String', $item->price) === 'recurring') {
-          $calculatedItem['frequency_unit'] = $this->api->getValueFromStripeObject('recurring_interval', 'String', $item->price);
-          $calculatedItem['frequency_interval'] = $this->api->getValueFromStripeObject('recurring_interval_count', 'Int', $item->price);
-        }
-
-        if (empty($calculatedItem['frequency_unit'])) {
-          \Civi::log('stripe')->warning("StripeIPN: {$objectData->id} customer.subscription.updated:
-            Non recurring subscription items are not supported");
-        }
-        else {
-          $intervalKey = $calculatedItem['currency'] . '_' . $calculatedItem['frequency_unit'] . '_' . $calculatedItem['frequency_interval'];
-          if (isset($calculatedItems[$intervalKey])) {
-            // If we have more than one subscription item with the same currency and frequency add up the amounts and combine.
-            $calculatedItem['amount'] += ($calculatedItems[$intervalKey]['amount'] ?? 0);
-            $calculatedItem['subscriptionItem'] = $calculatedItems[$intervalKey]['subscriptionItem'];
-          }
-          $calculatedItem['subscriptionItem'][] = $subscriptionItem;
-          $calculatedItems[$intervalKey] = $calculatedItem;
-        }
-      }
+      $calculatedItems = $this->api->calculateItemsForSubscription($subscriptionID, $objectData);
     }
 
     // $calculatedItems now contains array of new prices by key [currency]_[frequency_unit]_[frequency_interval]
