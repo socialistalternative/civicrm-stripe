@@ -25,14 +25,9 @@ class Events {
    */
   private $api;
 
-  /**
-   * @var \CRM_Core_Payment_Stripe Payment processor
-   */
-  private $paymentProcessor;
-
   public function __construct(int $paymentProcessorID) {
     $this->setPaymentProcessor($paymentProcessorID);
-    $this->api = new \Civi\Stripe\Api($this->paymentProcessor);
+    $this->api = new \Civi\Stripe\Api($this->_paymentProcessor);
   }
 
   /**
