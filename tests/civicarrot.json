@@ -9,7 +9,7 @@
       {
         "php-versions": "7.4",
         "drupal": "9.5.*",
-        "civicrm": "5.64.*"
+        "civicrm": "5.65.*"
       }
     ]
   }
