@@ -9,6 +9,23 @@ Releases use the following numbering system:
 
 * **[BC]**: Items marked with [BC] indicate a breaking change that will require updates to your code if you are using that code in your extension.
 
+## Release 6.11 (not yet released)
+
+### New Requirements
+
+* mjwpaymentapi@0.1: https://lab.civicrm.org/extensions/mjwpaymentapi
+* mjwshared@1.2.19.
+
+### New Features
+
+#### Update Subscription
+Subscription amounts can now be updated via the Stripe Dashboard or by editing the recurring contribution in CiviCRM.
+
+You can use the [upgraderecur](https://lab.civicrm.org/extensions/upgraderecur) extension to perform bulk upgrades (eg. a Membership price subscription increase).
+But you must use MJW branch: TODO
+
+TODO: Tests still need to be written for update in both directions.
+
 ## Release 6.10.2 (2023-11-29)
 
 **This is the same as 6.10.1 but with a fix for upgrader issues (https://lab.civicrm.org/extensions/stripe/-/issues/460).**
