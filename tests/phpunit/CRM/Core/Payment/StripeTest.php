@@ -146,7 +146,7 @@ class CRM_Core_Payment_Stripe_Test extends CRM_Stripe_BaseTest {
       $planNotFoundException = \Stripe\Exception\InvalidRequestException::factory(
           'mock message unused untested'); // , null, null, null, null,
           // 'resource_missing');
-      $planNotFoundException->setError((object) ['code' => 'resource_missing']);
+      $planNotFoundException->setStripeCode('resource_missing');
       $stripeClient->plans->method('retrieve')->willThrowException($planNotFoundException);
       $stripeClient->plans->method('create')->willReturn($mockPlan);
 

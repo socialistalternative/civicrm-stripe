@@ -328,17 +328,18 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
 
     switch (get_class($e)) {
       case 'Stripe\Exception\CardException':
+        /** @var \Stripe\Exception\CardException $e */
         // Since it's a decline, \Stripe\Exception\CardException will be caught
         \Civi::log('stripe')->error($this->getLogPrefix() . $op . ': ' . get_class($e) . ': ' . $e->getMessage() . print_r($e->getJsonBody(),TRUE));
-        $error['code'] = $e->getError()->code;
-        $error['message'] = $e->getError()->message;
+        $error['code'] = $e->getStripeCode();
+        $error['message'] = $e->getMessage();
         return $error;
 
       case 'Stripe\Exception\RateLimitException':
         // Too many requests made to the API too quickly
       case 'Stripe\Exception\InvalidRequestException':
         // Invalid parameters were supplied to Stripe's API
-        switch ($e->getError()->code) {
+        switch ($e->getStripeCode()) {
           case 'payment_intent_unexpected_state':
             $genericError['message'] = E::ts('An error occurred while processing the payment');
             break;
@@ -377,29 +378,22 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
    * @return \Stripe\Plan
    */
   public function createPlan(\Civi\Payment\PropertyBag $propertyBag, int $amount): \Stripe\Plan {
-    $planId = "every-{$propertyBag->getRecurFrequencyInterval()}-{$propertyBag->getRecurFrequencyUnit()}-{$amount}-" . strtolower($propertyBag->getCurrency());
-
-    if ($this->_paymentProcessor['is_test']) {
-      $planId .= '-test';
-    }
+    $planID = "every-{$propertyBag->getRecurFrequencyInterval()}-{$propertyBag->getRecurFrequencyUnit()}-{$amount}-" . strtolower($propertyBag->getCurrency());
 
     // Try and retrieve existing plan from Stripe
     // If this fails, we'll create a new one
     try {
-      $plan = $this->stripeClient->plans->retrieve($planId);
+      $plan = $this->stripeClient->plans->retrieve($planID);
     }
     catch (\Stripe\Exception\InvalidRequestException $e) {
-      // The following call is just for logging's sake.
-      $this->parseStripeException('plan_retrieve', $e);
-      if ($e->getError()->code === 'resource_missing') {
-        $formatted_amount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $propertyBag->getCurrency());
-        $productName = "CiviCRM " . ($propertyBag->has('membership_name') ? $propertyBag->getCustomProperty('membership_name') . ' ' : '') . "every {$propertyBag->getRecurFrequencyInterval()} {$propertyBag->getRecurFrequencyUnit()}(s) {$propertyBag->getCurrency()}{$formatted_amount}";
-        if ($this->_paymentProcessor['is_test']) {
-          $productName .= '-test';
-        }
+      if ($e->getStripeCode() === 'resource_missing') {
+        $formattedAmount = CRM_Utils_Money::formatLocaleNumericRoundedByCurrency(($amount / 100), $propertyBag->getCurrency());
+        $productName = "{$propertyBag->getCurrency()}{$formattedAmount} "
+          . ($propertyBag->has('membership_name') ? $propertyBag->getCustomProperty('membership_name') . ' ' : '')
+          . "every {$propertyBag->getRecurFrequencyInterval()} {$propertyBag->getRecurFrequencyUnit()}(s)";
         $product = $this->stripeClient->products->create([
-          "name" => $productName,
-          "type" => "service"
+          'name' => $productName,
+          'type' => 'service'
         ]);
         // Create a new Plan.
         $stripePlan = [
@@ -407,15 +401,15 @@ class CRM_Core_Payment_Stripe extends CRM_Core_Payment {
           'interval' => $propertyBag->getRecurFrequencyUnit(),
           'product' => $product->id,
           'currency' => $propertyBag->getCurrency(),
-          'id' => $planId,
+          'id' => $planID,
           'interval_count' => $propertyBag->getRecurFrequencyInterval(),
         ];
         $plan = $this->stripeClient->plans->create($stripePlan);
       }
     }
-
     return $plan;
   }
+
   /**
    * Override CRM_Core_Payment function
    *
