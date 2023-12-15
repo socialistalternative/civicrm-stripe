@@ -109,6 +109,8 @@ to implement.
 
 ## Update Subscription
 
+**Implemented for "amount" in Stripe 6.11**
+
 See: [Issue#18](https://lab.civicrm.org/extensions/stripe/-/issues/18)
 
 #### Stripe -> CiviCRM
