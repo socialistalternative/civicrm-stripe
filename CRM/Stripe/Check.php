@@ -25,8 +25,9 @@ class CRM_Stripe_Check {
   /**
    * @var string
    */
-  const MIN_VERSION_MJWSHARED = '1.2.17';
+  const MIN_VERSION_MJWSHARED = '1.2.19';
   const MIN_VERSION_FIREWALL = '1.5.9';
+  const MIN_VERSION_MJWPAYMENTAPI = '0.1';
 
   /**
    * @var array
@@ -48,6 +49,7 @@ class CRM_Stripe_Check {
    */
   public function checkRequirements() {
     $this->checkExtensionMjwshared();
+    $this->checkExtensionMjwPaymentApi();
     $this->checkExtensionFirewall();
     $this->checkWebhooks();
     $this->checkFailedPaymentIntents();
@@ -164,6 +166,42 @@ class CRM_Stripe_Check {
     }
     if (isset($extensions['id']) && $extensions['values'][$extensions['id']]['status'] === 'installed') {
       $this->requireExtensionMinVersion($extensionName, CRM_Stripe_Check::MIN_VERSION_FIREWALL, $extensions['values'][$extensions['id']]['version']);
+    }
+  }
+
+  /**
+   * @throws \CiviCRM_API3_Exception
+   */
+  private function checkExtensionMjwPaymentApi() {
+    $extensionName = 'mjwpaymentapi';
+    $extensions = civicrm_api3('Extension', 'get', [
+      'full_name' => $extensionName,
+    ]);
+
+    if (empty($extensions['count']) || ($extensions['values'][$extensions['id']]['status'] !== 'installed')) {
+      $message = new CRM_Utils_Check_Message(
+        __FUNCTION__ . E::SHORT_NAME . '_requirements',
+        E::ts('The <em>%1</em> extension requires the <em>MJW Payment API</em> extension which is not installed. See <a href="%2" target="_blank">details</a> for more information.',
+          [
+            1 => ucfirst(E::SHORT_NAME),
+            2 => 'https://civicrm.org/extensions/mjwpaymentapi',
+          ]
+        ),
+        E::ts('%1: Missing Requirements', [1 => ucfirst(E::SHORT_NAME)]),
+        \Psr\Log\LogLevel::ERROR,
+        'fa-money'
+      );
+      $message->addAction(
+        E::ts('Install now'),
+        NULL,
+        'href',
+        ['path' => 'civicrm/admin/extensions', 'query' => ['action' => 'update', 'id' => $extensionName, 'key' => $extensionName]]
+      );
+      $this->messages[] = $message;
+      return;
+    }
+    if (isset($extensions['id']) && $extensions['values'][$extensions['id']]['status'] === 'installed') {
+      $this->requireExtensionMinVersion($extensionName, self::MIN_VERSION_MJWPAYMENTAPI, $extensions['values'][$extensions['id']]['version']);
     }
   }
 

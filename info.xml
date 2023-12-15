@@ -27,6 +27,7 @@
   </comments>
   <requires>
     <ext>mjwshared</ext>
+    <ext>mjwpaymentapi</ext>
     <ext>firewall</ext>
   </requires>
   <civix>
