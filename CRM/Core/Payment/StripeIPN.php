@@ -390,9 +390,6 @@ class CRM_Core_Payment_StripeIPN {
     }
 
     $this->setExceptionMode(FALSE);
-    if (isset($emailReceipt)) {
-      $this->setSendEmailReceipt($emailReceipt);
-    }
 
     $processingResult = $this->processWebhookEvent();
     // Update the stored webhook event.
