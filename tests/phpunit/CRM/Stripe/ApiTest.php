@@ -324,7 +324,7 @@ class CRM_Stripe_ApiTest extends CRM_Stripe_BaseTest {
         'id' => 'in_mock',
         'object' => 'invoice',
         'subscription' => 'sub_mock',
-        'paid' => TRUE
+        'status' => 'paid',
       ]);
       $mockInvoicesCollection = new \Stripe\Collection();
       $mockInvoicesCollection->data = [$mockInvoice];

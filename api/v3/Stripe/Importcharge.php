@@ -149,7 +149,7 @@ function civicrm_api3_stripe_importcharge($params) {
     ->execute()
     ->first();
 
-  if (CRM_Stripe_Api::getObjectParam('status_id', $stripeInvoice) === 'Completed') {
+  if (CRM_Stripe_Api::getObjectParam('status', $stripeInvoice) === 'Completed') {
     $paymentParams = [
       'contribution_id' => $contribution['id'],
       'total_amount' => $contributionParams['total_amount'],
