@@ -68,6 +68,9 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
     if (!is_dir(__DIR__ . '/../../../../../mjwshared')) {
       civicrm_api3('Extension', 'download', ['key' => 'mjwshared']);
     }
+    if (!is_dir(__DIR__ . '/../../../../../mjwshared')) {
+      civicrm_api3('Extension', 'download', ['key' => 'mjwpaymentapi']);
+    }
     if (!is_dir(__DIR__ . '/../../../../../firewall')) {
       civicrm_api3('Extension', 'download', ['key' => 'firewall']);
     }
@@ -75,6 +78,7 @@ abstract class CRM_Stripe_BaseTest extends \PHPUnit\Framework\TestCase implement
     return \Civi\Test::headless()
       ->installMe(__DIR__)
       ->install('mjwshared')
+      ->install('mjwpaymentapi')
       ->install('firewall')
       ->apply($reInstall);
   }
