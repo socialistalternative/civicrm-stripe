@@ -13,8 +13,8 @@ Releases use the following numbering system:
 
 ### New Requirements
 
-* mjwpaymentapi@0.1: https://lab.civicrm.org/extensions/mjwpaymentapi
-* mjwshared@1.2.19.
+* mjwpaymentapi@0.2: https://lab.civicrm.org/extensions/mjwpaymentapi
+* mjwshared@1.2.20.
 
 ### New Features
 
@@ -22,7 +22,7 @@ Releases use the following numbering system:
 Subscription amounts can now be updated via the Stripe Dashboard or by editing the recurring contribution in CiviCRM.
 
 You can use the [upgraderecur](https://lab.civicrm.org/extensions/upgraderecur) extension to perform bulk upgrades (eg. a Membership price subscription increase).
-But you must use MJW branch: TODO
+But you must use MJW branch: https://lab.civicrm.org/mattwire/upgraderecur/-/tree/mjw
 
 TODO: Tests still need to be written for update in both directions.
 
