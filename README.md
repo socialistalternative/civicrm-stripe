@@ -1,3 +1,29 @@
+> [!NOTE]
+> This is a fork of the [CiviCRM Stripe extension](https://lab.civicrm.org/extensions/stripe).
+
+## Sync with upstream
+
+To update this fork with changes from the upstream repo:
+
+```sh
+# Add upstream remote
+git remote add upstream https://lab.civicrm.org/extensions/stripe.git
+
+# Fetch and merge changes
+git fetch upstream
+git merge upstream/master
+
+# Reset back to the latest tagged release
+git reset --hard <version>
+```
+
+## Patches in this fork
+
+- Don't pass `cancel_url` to Checkout, since it's currently broken for event registration ([`6bd6e7f`](https://github.com/socialistalternative/civicrm-stripe/commit/6bd6e7ff1a49de84f89de6161e82785e6c1fb1be))
+- Pass `receipt_email` in the payment intent for Checkout, to force receipt emails to be sent when disabled in Stripe account settings ([`4f0d039`](https://github.com/socialistalternative/civicrm-stripe/commit/4f0d039977d36c3d2470bb3a06d9d7e38b81b89c))
+
+---
+
 # CiviCRM Stripe Payment Processor
 
 Integrates the Stripe payment processor (for Credit/Debit cards) into CiviCRM so you can use it to accept Credit / Debit card payments on your site.
