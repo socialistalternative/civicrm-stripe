@@ -199,7 +199,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
       'line_items' => $this->buildCheckoutLineItems($lineItems, $propertyBag),
       'mode' => $propertyBag->getIsRecur() ? 'subscription' : 'payment',
       'success_url' => $successUrl,
-      'cancel_url' => $failUrl,
+      // 'cancel_url' => $failUrl,
       // 'customer_email' => $propertyBag->getEmail(),
       'customer' => $stripeCustomerID,
       // 'submit_type' => one of 'auto', pay, book, donate
