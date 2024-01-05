@@ -217,6 +217,7 @@ class CRM_Core_Payment_StripeCheckout extends CRM_Core_Payment_Stripe {
     else {
       $checkoutSessionParams['payment_intent_data'] = [
         'description' => $this->getDescription($propertyBag, 'description'),
+        'receipt_email' => $propertyBag->getEmail(),
       ];
     }
 
